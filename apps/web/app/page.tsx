@@ -155,7 +155,7 @@ function Dashboard() {
             <article>
               <span>Security assessment</span>
               <strong className="unscored">Insufficient coverage</strong>
-              <small>One scenario; no numeric score</small>
+              <small>Synthetic fixtures; no numeric score</small>
             </article>
           </div>
           {(projects.error || agents.error) && (

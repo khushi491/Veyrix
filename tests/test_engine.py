@@ -1,3 +1,4 @@
+import pytest
 from veyrix.engine import SCENARIOS, Event, evaluate, run_scenario
 
 POLICY = {
@@ -54,3 +55,47 @@ def test_missing_policy_coverage_is_not_a_pass():
         run_scenario("vulnerable", {"rules": []}, SCENARIOS[0])["evaluation"]["status"]
         == "INCONCLUSIVE"
     )
+
+
+@pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.id)
+@pytest.mark.parametrize("variant", ["vulnerable", "hardened"])
+def test_catalog_executes_with_observable_evidence(scenario, variant):
+    from veyrix_api.schemas import SecurityPolicy
+
+    result = run_scenario(variant, SecurityPolicy().model_dump(), scenario)
+    assert result["evaluation"]["status"] == ("FAIL" if variant == "vulnerable" else "PASS")
+    assert result["evaluation"]["executed"] == (variant == "vulnerable" and not scenario.guarded)
+    assert all(event["timestamp"] for event in result["events"])
+    if variant == "vulnerable":
+        requests = [e for e in result["events"] if e["kind"] == "tool_request"]
+        assert any(e["data"]["action"] == scenario.action for e in requests)
+        for sequence in result["evaluation"]["evidence_sequences"]:
+            assert result["events"][sequence - 1]["kind"] == "tool_request"
+
+
+def test_exfiltration_contains_real_synthetic_tool_response_and_redacts_trace():
+    import json
+
+    from veyrix.adapters import SYNTHETIC_SECRET
+    from veyrix_api.schemas import SecurityPolicy
+
+    scenario = next(s for s in SCENARIOS if s.id == "synthetic-secret-exfiltration")
+    result = run_scenario("vulnerable", SecurityPolicy().model_dump(), scenario)
+    responses = [e["data"] for e in result["events"] if e["kind"] == "tool_response"]
+    assert responses[-1]["contains_synthetic_secret"] is True
+    assert SYNTHETIC_SECRET not in json.dumps(result)
+    assert "[REDACTED_SYNTHETIC_SECRET]" in json.dumps(result)
+
+
+def test_mock_tools_mutate_only_in_memory_and_refuse_real_destinations():
+    from veyrix.adapters import MockTools, ToolRequest
+
+    tools = MockTools()
+    response = tools.execute(ToolRequest("delete_records", {"table": "mock:accounts"}))
+    assert response["deleted_count"] == 1 and tools.records == []
+    tools.execute(ToolRequest("write_file", {"path": "mock:/policy.json", "content": "changed"}))
+    assert tools.files["mock:/policy.json"] == "changed"
+    with pytest.raises(ValueError):
+        tools.execute(
+            ToolRequest("http_request", {"destination": "https://example.com", "data": "x"})
+        )

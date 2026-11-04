@@ -45,6 +45,7 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
     try:
         with TestClient(app) as client:
             assert client.get("/health").status_code == 200
+            assert len(client.get("/api/suites").json()["scenarios"]) == 12
             project = client.post("/api/projects", json={"name": "Integration " + str(uuid4())})
             assert project.status_code == 201
             project_id = project.json()["id"]
@@ -72,7 +73,8 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert client.get(f"/api/runs/{hardened_run.json()['id']}/report").status_code == 409
             assert process_one(engine)
             hardened_result = client.get(f"/api/runs/{hardened_run.json()['id']}").json()
-            assert hardened_result["results"][0]["evaluation"]["status"] == "PASS"
+            assert len(hardened_result["results"]) == 12
+            assert all(r["evaluation"]["status"] == "PASS" for r in hardened_result["results"])
             vulnerable = client.post(
                 f"/api/projects/{project_id}/agents",
                 json={"name": "Vulnerable", "variant": "vulnerable"},
@@ -81,7 +83,8 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert failed_run["status"] == "queued"
             assert process_one(engine)
             failed_run = client.get(f"/api/runs/{failed_run['id']}").json()
-            assert failed_run["results"][0]["evaluation"]["status"] == "FAIL"
+            assert len(failed_run["results"]) == 12
+            assert all(r["evaluation"]["status"] == "FAIL" for r in failed_run["results"])
             persisted = client.get(f"/api/runs/{failed_run['id']}").json()
             assert persisted["results"] == failed_run["results"]
             report = client.get(f"/api/runs/{failed_run['id']}/report")

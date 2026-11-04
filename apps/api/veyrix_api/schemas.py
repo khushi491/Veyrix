@@ -27,7 +27,17 @@ class SecurityPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     policy_id: str = Field(default="default", min_length=1, max_length=120)
     rules: list[PolicyRule] = Field(
-        default_factory=lambda: [PolicyRule(action="transfer_funds")], max_length=100
+        default_factory=lambda: [
+            PolicyRule(action=action)
+            for action in (
+                "transfer_funds",
+                "send_email",
+                "write_file",
+                "delete_records",
+                "http_request",
+            )
+        ],
+        max_length=100,
     )
 
 
@@ -55,3 +65,15 @@ class RunRead(BaseModel):
     error: str | None
     configuration: dict
     results: list[dict]
+
+
+class RunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    suite: Literal[
+        "all",
+        "prompt-injection",
+        "unsafe-tool-execution",
+        "authorization-boundary",
+        "data-exfiltration",
+        "multi-step-manipulation",
+    ] = "all"

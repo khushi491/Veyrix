@@ -6,13 +6,20 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, HTTPException, Response
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
-from veyrix.engine import ENGINE_VERSION, SCENARIO_VERSION, SCENARIOS
+from veyrix.engine import ENGINE_VERSION, SCENARIOS, select_scenarios
 
 from veyrix_api.config import settings
 from veyrix_api.db import get_session
 from veyrix_api.jobs import notify_worker
 from veyrix_api.models import Agent, Project, TestRun
-from veyrix_api.schemas import AgentCreate, AgentRead, ProjectCreate, ProjectRead, RunRead
+from veyrix_api.schemas import (
+    AgentCreate,
+    AgentRead,
+    ProjectCreate,
+    ProjectRead,
+    RunCreate,
+    RunRead,
+)
 
 app = FastAPI(title="Veyrix API", version="0.1.0")
 Db = Annotated[Session, Depends(get_session)]
@@ -79,10 +86,12 @@ def create_agent(project_id: UUID, payload: AgentCreate, db: Db) -> Agent:
 @app.post(
     "/api/agents/{agent_id}/runs", response_model=RunRead, status_code=202, dependencies=[Local]
 )
-def execute_local_run(agent_id: UUID, db: Db) -> TestRun:
+def execute_local_run(agent_id: UUID, db: Db, payload: RunCreate | None = None) -> TestRun:
     agent = db.get(Agent, str(agent_id))
     if agent is None:
         raise HTTPException(404, "Agent not found")
+    suite = payload.suite if payload else "all"
+    selected = select_scenarios(suite)
     run = TestRun(
         agent_id=agent.id,
         status="queued",
@@ -94,7 +103,8 @@ def execute_local_run(agent_id: UUID, db: Db) -> TestRun:
             "engine_version": ENGINE_VERSION,
             "environment": "in-memory synthetic fixture",
             "model": None,
-            "scenarios": [{"id": s.id, "version": SCENARIO_VERSION} for s in SCENARIOS],
+            "suite": suite,
+            "scenarios": [{"id": s.id, "version": s.version} for s in selected],
         },
         results=[],
     )
@@ -137,7 +147,7 @@ def json_report(run_id: UUID, db: Db) -> Response:
         "run": RunRead.model_validate(run).model_dump(mode="json"),
         "limitations": [
             "Deterministic synthetic fixture; no external model evaluated.",
-            "One scenario; insufficient coverage for a security score.",
+            "Synthetic fixtures do not establish robustness of external models.",
             "Only bundled fixtures run in bounded subprocesses; external agent isolation is incomplete.",
         ],
     }
@@ -161,3 +171,22 @@ def cancel_run(run_id: UUID, db: Db) -> TestRun:
     db.commit()
     db.refresh(run)
     return run
+
+
+@app.get("/api/suites", dependencies=[Local])
+def suites() -> dict:
+    return {
+        "engine_version": ENGINE_VERSION,
+        "scenarios": [
+            {
+                "id": s.id,
+                "title": s.title,
+                "category": s.category,
+                "severity": s.severity,
+                "version": s.version,
+                "channel": s.channel,
+                "guarded": s.guarded,
+            }
+            for s in SCENARIOS
+        ],
+    }

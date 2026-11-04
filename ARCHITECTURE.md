@@ -24,7 +24,7 @@ when the findings explorer is implemented.
 ## Boundaries
 
 Local development mode is explicitly opt-in. Hosted authentication is fail-closed and
-not implemented. One synthetic document-injection scenario runs in the background worker. The upcoming runner must use synthetic
+not implemented. Twelve synthetic security scenarios run in the background worker. The upcoming runner must use synthetic
 tools, blocked external networking, timeouts and resource limits. Neither agent output
 nor MCP responses may be executed as shell commands on the host.
 

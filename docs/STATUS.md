@@ -10,6 +10,9 @@ Tasks are committed and pushed individually after verification.
    and JSON assessment export. Execution uses a durable background worker with subprocess timeouts.
 4. Worker lifecycle: queued/running/terminal progress, cancellation, exclusive claims,
    expired-lease recovery, bounded child processes and restricted Compose worker.
-5. Next: remaining scenarios, MCP, findings, reporting, CLI and release docs.
+5. Scenario catalog: 12 versioned cases across 5 categories; in-memory files, records,
+   payment ledger, email/outbound sinks; chained tool responses; synthetic secret redaction;
+   suite selection; guarded execution distinguishes attempted from executed violations.
+6. Next: MCP, findings, reporting, CLI and release docs.
 
 No security scores, findings, or agent execution results are fabricated.

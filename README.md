@@ -3,8 +3,8 @@
 Security for Autonomous Intelligence. Break your agents before attackers do.
 
 Veyrix is an AI agent security testing platform under active development. The current
-foundation supports persistent projects, local agent registration, and one reproducible
-injection assessment with observable traces and JSON export. MCP, scoring, SARIF, CLI, and hosted authentication are not implemented yet.
+foundation supports persistent projects, local agent registration, and twelve versioned synthetic
+security scenarios with observable traces and JSON export. MCP, scoring, SARIF, CLI, and hosted authentication are not implemented yet.
 
 ## Local setup
 
@@ -74,6 +74,7 @@ Open http://127.0.0.1:3000. The same-origin `/api` proxy forwards requests to th
 API. Create a project, then register a hardened or vulnerable local agent configuration.
 Run an injection assessment to compare vulnerable and hardened deterministic fixtures.
 The dashboard shows actual in-memory mock tool execution; no external LLM is evaluated.
-No security score is available with this coverage.
+Select all scenarios or a category-specific suite. No numeric security score is implemented yet.
+Existing agent policies remain unchanged; tests without an applicable rule yield INCONCLUSIVE.
 
 Frontend checks: `npm run typecheck`, `npm run build`, and `npm audit` from `apps/web`.

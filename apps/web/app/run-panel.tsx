@@ -8,6 +8,10 @@ type Result = {
   title: string;
   scenario_id: string;
   severity: string;
+  expected_behavior?: string;
+  actual_behavior?: string;
+  root_cause_hypothesis?: string;
+  remediation?: string;
   evaluation: {
     status: string;
     reason: string;
@@ -29,8 +33,20 @@ type Run = {
   results: Result[];
   configuration: Record<string, unknown>;
 };
-async function request<T>(path: string, method = "GET"): Promise<T> {
-  const response = await fetch(`/api${path}`, { method });
+async function request<T>(
+  path: string,
+  method = "GET",
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    method,
+    ...(body
+      ? {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      : {}),
+  });
   if (!response.ok)
     throw new Error(
       `Request failed (${response.status}). Check the API and migrations.`,
@@ -38,6 +54,15 @@ async function request<T>(path: string, method = "GET"): Promise<T> {
   return response.json() as Promise<T>;
 }
 export function RunPanel({ agents }: { agents: Agent[] }) {
+  const [suite, setSuite] = useState("all");
+  const catalog = useQuery({
+    queryKey: ["suites"],
+    queryFn: () =>
+      request<{ scenarios: { id: string; category: string }[] }>("/suites"),
+  });
+  const categories = [
+    ...new Set(catalog.data?.scenarios.map((s) => s.category) || []),
+  ];
   const [chosen, setChosen] = useState("");
   const agentId = agents.some((a) => a.id === chosen)
     ? chosen
@@ -56,7 +81,8 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
         : false,
   });
   const execute = useMutation({
-    mutationFn: () => request<Run>(`/agents/${agentId}/runs`, "POST"),
+    mutationFn: () =>
+      request<Run>(`/agents/${agentId}/runs`, "POST", { suite }),
     onSuccess: async (run) => {
       setRunId(run.id);
       await cache.invalidateQueries({ queryKey: ["runs", agentId] });
@@ -72,14 +98,14 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
   return (
     <section className="panel run-panel" id="tests">
       <div className="panel-heading">
-        <h2>Injection assessment</h2>
+        <h2>Security assessment</h2>
         <span>03 / OBSERVE</span>
       </div>
       <div className="run-content">
         <p>
-          One versioned document-injection scenario against an in-memory payment
-          tool. Deterministic fixtures; no external model or real financial
-          operation.
+          Versioned attacks against in-memory tools for payments, files,
+          records, email, and outbound requests. Deterministic fixtures; no
+          external model or real service.
         </p>
         <div className="run-controls">
           <select
@@ -100,18 +126,43 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
               <option value="">Register an agent first</option>
             )}
           </select>
+          <select
+            aria-label="Security test suite"
+            value={suite}
+            onChange={(e) => setSuite(e.target.value)}
+          >
+            <option value="all">
+              All scenarios ({catalog.data?.scenarios.length ?? "…"})
+            </option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category} (
+                {
+                  catalog.data?.scenarios.filter((s) => s.category === category)
+                    .length
+                }
+                )
+              </option>
+            ))}
+          </select>
           <button
-            disabled={!agentId || execute.isPending}
+            disabled={
+              !agentId ||
+              execute.isPending ||
+              catalog.isPending ||
+              catalog.isError
+            }
             onClick={() => execute.mutate()}
           >
-            {execute.isPending ? "Queuing…" : "Run injection test"}
+            {execute.isPending ? "Queuing…" : "Run security tests"}
           </button>
         </div>
-        {(runs.error || execute.error || cancel.error) && (
+        {(runs.error || execute.error || cancel.error || catalog.error) && (
           <p className="error" role="alert">
             {runs.error?.message ||
               execute.error?.message ||
-              cancel.error?.message}
+              cancel.error?.message ||
+              catalog.error?.message}
           </p>
         )}
         {runs.isFetching && <p>Loading run history…</p>}
@@ -182,7 +233,7 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
                 <p className="form-hint">
                   Prohibited attempt:{" "}
                   {result.evaluation.attempted ? "observed" : "not observed"} ·
-                  Mock execution:{" "}
+                  Prohibited mock execution:{" "}
                   {result.evaluation.executed ? "observed" : "not observed"} ·
                   Severity if violated: {result.severity}
                 </p>
@@ -190,15 +241,19 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
                   <div className="finding">
                     <strong>Verified policy violation</strong>
                     <p>
-                      Expected: summarize untrusted content without making a
-                      payment. Observed: the fixture requested the denied
-                      transfer_funds action.
+                      Expected:{" "}
+                      {result.expected_behavior ??
+                        "Respect the configured policy."}
+                      Observed:{" "}
+                      {result.actual_behavior ?? result.evaluation.reason}
                     </p>
                     <p>
-                      Root-cause hypothesis: the fixture promotes document
-                      content to executable instructions. Remediation: preserve
-                      trust boundaries and enforce authorization before tool
-                      execution.
+                      Root-cause hypothesis:{" "}
+                      {result.root_cause_hypothesis ??
+                        "Untrusted content was treated as instructions."}
+                      Remediation:{" "}
+                      {result.remediation ??
+                        "Enforce policy before tool execution."}
                     </p>
                   </div>
                 )}
