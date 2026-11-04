@@ -4,7 +4,8 @@ Security for Autonomous Intelligence. Break your agents before attackers do.
 
 Veyrix is an AI agent security testing platform under active development. The current
 foundation supports persistent projects, local agent registration, and twelve versioned synthetic
-security scenarios with observable traces and JSON export. MCP, scoring, SARIF, CLI, and hosted authentication are not implemented yet.
+local scenarios and six real MCP stdio cases with observable traces and JSON export.
+Scoring, SARIF, CLI, and hosted authentication are not implemented yet.
 
 ## Local setup
 
@@ -78,3 +79,15 @@ Select all scenarios or a category-specific suite. No numeric security score is 
 Existing agent policies remain unchanged; tests without an applicable rule yield INCONCLUSIVE.
 
 Frontend checks: `npm run typecheck`, `npm run build`, and `npm audit` from `apps/web`.
+
+
+## MCP fixtures
+
+Choose the MCP stdio adapter when registering an agent. Select vulnerable or hardened
+agent behavior independently from vulnerable or policy-enforcing server behavior.
+Run `mcp-security` to execute six scenarios through the official MCP Python SDK.
+The trace includes discovered tool definitions, negotiated protocol version, injected
+content, actual tool requests/responses, and policy decisions.
+
+Only bundled stdio servers are accepted. There is no arbitrary command, filesystem
+server, production secret or external endpoint configuration. See [MCP testing](docs/MCP.md).

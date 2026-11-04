@@ -29,19 +29,29 @@ def execute_scenario(configuration: dict, scenario_id: str) -> dict:
         "variant": configuration["variant"],
         "policy": configuration["policy"],
         "scenario_id": scenario_id,
+        "adapter": configuration.get("adapter", "local"),
+        "server_variant": configuration.get("server_variant", "vulnerable"),
     }
-    result = subprocess.run(
+    with subprocess.Popen(
         [sys.executable, "-m", "veyrix.runner"],
-        input=json.dumps(payload),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        capture_output=True,
-        timeout=SCENARIO_TIMEOUT,
-        check=True,
+        start_new_session=True,
         env={"PATH": os.defpath, "PYTHONUNBUFFERED": "1"},
-    )
-    if len(result.stdout) > 1024 * 1024:
+    ) as process:
+        try:
+            stdout, _ = process.communicate(json.dumps(payload), timeout=SCENARIO_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+            raise
+        if process.returncode:
+            raise subprocess.CalledProcessError(process.returncode, "bundled-runner")
+    if len(stdout) > 1024 * 1024:
         raise ValueError("Runner response exceeded size limit")
-    return json.loads(result.stdout)
+    return json.loads(stdout)
 
 
 def recover_interrupted(db_engine: Engine) -> None:

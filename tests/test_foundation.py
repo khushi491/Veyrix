@@ -45,7 +45,7 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
     try:
         with TestClient(app) as client:
             assert client.get("/health").status_code == 200
-            assert len(client.get("/api/suites").json()["scenarios"]) == 12
+            assert len(client.get("/api/suites").json()["scenarios"]) == 18
             project = client.post("/api/projects", json={"name": "Integration " + str(uuid4())})
             assert project.status_code == 201
             project_id = project.json()["id"]
@@ -92,6 +92,33 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert report.json()["run"]["id"] == failed_run["id"]
             assert "attachment" in report.headers["content-disposition"]
             assert persisted["configuration"]["policy"]["rules"][0]["action"] == "transfer_funds"
+            mcp_agent = client.post(
+                f"/api/projects/{project_id}/agents",
+                json={
+                    "name": "MCP fixture",
+                    "adapter": "mcp",
+                    "variant": "vulnerable",
+                    "server_variant": "hardened",
+                },
+            ).json()
+            assert (
+                client.post(
+                    f"/api/agents/{mcp_agent['id']}/runs", json={"suite": "prompt-injection"}
+                ).status_code
+                == 422
+            )
+            mcp_run = client.post(
+                f"/api/agents/{mcp_agent['id']}/runs", json={"suite": "mcp-security"}
+            ).json()
+            assert len(mcp_run["configuration"]["scenarios"]) == 6
+            assert process_one(engine)
+            mcp_result = client.get(f"/api/runs/{mcp_run['id']}").json()
+            assert mcp_result["status"] == "completed"
+            assert len(mcp_result["results"]) == 6
+            assert all(
+                r["evaluation"]["attempted"] and not r["evaluation"]["executed"]
+                for r in mcp_result["results"]
+            )
 
         # A fresh connection observes the committed records.
         with engine.connect() as connection:

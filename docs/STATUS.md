@@ -13,6 +13,9 @@ Tasks are committed and pushed individually after verification.
 5. Scenario catalog: 12 versioned cases across 5 categories; in-memory files, records,
    payment ledger, email/outbound sinks; chained tool responses; synthetic secret redaction;
    suite selection; guarded execution distinguishes attempted from executed violations.
-6. Next: MCP, findings, reporting, CLI and release docs.
+6. MCP: official SDK stdio client, six versioned scenarios, tool discovery and resources,
+   vulnerable and policy-enforcing servers, independently configurable agent behavior,
+   SDK/protocol metadata and actual transport evidence.
+7. Next: findings explorer, scoring, SARIF/CLI and release docs.
 
 No security scores, findings, or agent execution results are fabricated.

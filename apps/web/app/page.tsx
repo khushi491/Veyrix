@@ -85,8 +85,12 @@ function Dashboard() {
     },
   });
   const createAgent = useMutation({
-    mutationFn: (body: { name: string; variant: string }) =>
-      api<Agent>(`/projects/${projectId}/agents`, body),
+    mutationFn: (body: {
+      name: string;
+      variant: string;
+      adapter: string;
+      server_variant: string;
+    }) => api<Agent>(`/projects/${projectId}/agents`, body),
     onSuccess: async () => {
       await cache.invalidateQueries({ queryKey: ["agents", projectId] });
       setError("");
@@ -267,11 +271,13 @@ function Dashboard() {
                       createAgent.mutate({
                         name,
                         variant: String(data.get("variant")),
+                        adapter: String(data.get("adapter")),
+                        server_variant: String(data.get("server_variant")),
                       });
                     }}
                   >
                     <label htmlFor="agent-name">
-                      Register a local example agent
+                      Register an example agent
                     </label>
                     <div className="form-row">
                       <input
@@ -284,6 +290,21 @@ function Dashboard() {
                       <select name="variant" aria-label="Agent variant">
                         <option value="hardened">Hardened</option>
                         <option value="vulnerable">Vulnerable</option>
+                      </select>
+                    </div>
+                    <div className="form-row integration-row">
+                      <select name="adapter" aria-label="Integration adapter">
+                        <option value="local">Local fixture</option>
+                        <option value="mcp">MCP stdio fixture</option>
+                      </select>
+                      <select
+                        name="server_variant"
+                        aria-label="MCP server policy enforcement"
+                      >
+                        <option value="vulnerable">Unguarded MCP server</option>
+                        <option value="hardened">
+                          Policy-enforcing MCP server
+                        </option>
                       </select>
                     </div>
                     <p className="form-hint">
@@ -307,9 +328,9 @@ function Dashboard() {
             <div>
               <strong>A clear starting point.</strong>
               <p>
-                Local fixture execution is available above. MCP, background
-                execution, broader coverage, and scoring are upcoming
-                milestones.
+                Local and MCP fixtures execute through the background worker.
+                These deterministic tests validate the assessment pipeline; they
+                do not measure external model robustness.
               </p>
             </div>
           </div>

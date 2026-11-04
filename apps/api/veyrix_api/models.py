@@ -29,6 +29,7 @@ class Agent(Record, Base):
     description: Mapped[str] = mapped_column(Text, default="")
     adapter: Mapped[str] = mapped_column(String(32))
     variant: Mapped[str] = mapped_column(String(32))
+    server_variant: Mapped[str] = mapped_column(String(32), default="vulnerable")
     policy: Mapped[dict] = mapped_column(JSON)
 
 

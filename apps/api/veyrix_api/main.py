@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException, Response
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION, SCENARIOS, select_scenarios
+from veyrix.engine.catalog import MCP_SCENARIOS
 
 from veyrix_api.config import settings
 from veyrix_api.db import get_session
@@ -91,13 +92,17 @@ def execute_local_run(agent_id: UUID, db: Db, payload: RunCreate | None = None) 
     if agent is None:
         raise HTTPException(404, "Agent not found")
     suite = payload.suite if payload else "all"
-    selected = select_scenarios(suite)
+    try:
+        selected = select_scenarios(suite, agent.adapter)
+    except ValueError as exc:
+        raise HTTPException(422, "Selected suite is unavailable for this adapter") from exc
     run = TestRun(
         agent_id=agent.id,
         status="queued",
         configuration={
             "agent_name": agent.name,
             "adapter": agent.adapter,
+            "server_variant": agent.server_variant,
             "variant": agent.variant,
             "policy": agent.policy,
             "engine_version": ENGINE_VERSION,
@@ -179,6 +184,7 @@ def suites() -> dict:
         "engine_version": ENGINE_VERSION,
         "scenarios": [
             {
+                "adapter": "mcp" if s in MCP_SCENARIOS else "local",
                 "id": s.id,
                 "title": s.title,
                 "category": s.category,
@@ -187,6 +193,6 @@ def suites() -> dict:
                 "channel": s.channel,
                 "guarded": s.guarded,
             }
-            for s in SCENARIOS
+            for s in (*SCENARIOS, *MCP_SCENARIOS)
         ],
     }

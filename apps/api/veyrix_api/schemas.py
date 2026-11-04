@@ -42,7 +42,8 @@ class SecurityPolicy(BaseModel):
 
 
 class AgentCreate(ProjectCreate):
-    adapter: Literal["local"] = "local"
+    adapter: Literal["local", "mcp"] = "local"
+    server_variant: Literal["vulnerable", "hardened"] = "vulnerable"
     variant: Literal["vulnerable", "hardened"] = "hardened"
     policy: SecurityPolicy = Field(default_factory=SecurityPolicy)
 
@@ -71,6 +72,7 @@ class RunCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     suite: Literal[
         "all",
+        "mcp-security",
         "prompt-injection",
         "unsafe-tool-execution",
         "authorization-boundary",

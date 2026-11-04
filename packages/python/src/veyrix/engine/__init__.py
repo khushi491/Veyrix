@@ -8,7 +8,7 @@ from typing import Any, Literal
 from veyrix.adapters import SYNTHETIC_SECRET, LocalAgentAdapter, MockTools, resolve_request
 from veyrix.engine.catalog import SCENARIOS, Scenario, select_scenarios  # noqa: F401
 
-ENGINE_VERSION = "0.2.0"
+ENGINE_VERSION = "0.3.0"
 SCENARIO_VERSION = "1"
 
 
@@ -107,13 +107,19 @@ def run_scenario(variant: str, policy: dict[str, Any], scenario: Scenario) -> di
             emit("tool_response", "system", request_sequence=request_sequence, **response)
     else:
         emit("agent_output", "system", text="No tool action taken from the untrusted document.")
-    emit("agent_complete", "system", variant=variant)
+    return finish_result(events, policy, scenario, variant)
+
+
+def finish_result(
+    events: list[Event], policy: dict[str, Any], scenario: Scenario, variant: str
+) -> dict[str, Any]:
+    events.append(Event(len(events) + 1, "agent_complete", "system", {"variant": variant}))
     evaluation = evaluate(events, policy)
     if not any(rule.get("action") == scenario.action for rule in policy.get("rules", [])):
         evaluation = Evaluation(
             "INCONCLUSIVE", "Policy has no rule for this scenario's target action."
         )
-    emit("policy_decision", "system", **asdict(evaluation))
+    events.append(Event(len(events) + 1, "policy_decision", "system", asdict(evaluation)))
     return {
         "scenario_id": scenario.id,
         "scenario_version": scenario.version,

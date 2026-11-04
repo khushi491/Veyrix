@@ -672,3 +672,18 @@ summary {
   color: #c2b9e5;
   background: #28233c;
 }
+
+.integration-row {
+  margin-top: 12px;
+}
+.integration-row select {
+  width: 50%;
+}
+.run-controls select {
+  max-width: 100%;
+}
+@media (max-width: 700px) {
+  .integration-row select {
+    width: 100%;
+  }
+}

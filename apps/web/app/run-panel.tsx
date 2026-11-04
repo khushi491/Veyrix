@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-type Agent = { id: string; name: string; variant: string };
+type Agent = { id: string; name: string; variant: string; adapter: string };
 type Result = {
   title: string;
   scenario_id: string;
@@ -58,15 +58,19 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
   const catalog = useQuery({
     queryKey: ["suites"],
     queryFn: () =>
-      request<{ scenarios: { id: string; category: string }[] }>("/suites"),
+      request<{
+        scenarios: { id: string; category: string; adapter: string }[];
+      }>("/suites"),
   });
-  const categories = [
-    ...new Set(catalog.data?.scenarios.map((s) => s.category) || []),
-  ];
   const [chosen, setChosen] = useState("");
   const agentId = agents.some((a) => a.id === chosen)
     ? chosen
     : agents[0]?.id || "";
+  const currentAdapter =
+    agents.find((a) => a.id === agentId)?.adapter || "local";
+  const availableScenarios =
+    catalog.data?.scenarios.filter((s) => s.adapter === currentAdapter) || [];
+  const categories = [...new Set(availableScenarios.map((s) => s.category))];
   const [runId, setRunId] = useState("");
   const cache = useQueryClient();
   const runs = useQuery({
@@ -113,6 +117,7 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
             value={agentId}
             onChange={(e) => {
               setChosen(e.target.value);
+              setSuite("all");
               setRunId("");
             }}
           >
@@ -132,13 +137,13 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
             onChange={(e) => setSuite(e.target.value)}
           >
             <option value="all">
-              All scenarios ({catalog.data?.scenarios.length ?? "…"})
+              All scenarios ({availableScenarios.length ?? "…"})
             </option>
             {categories.map((category) => (
               <option key={category} value={category}>
                 {category} (
                 {
-                  catalog.data?.scenarios.filter((s) => s.category === category)
+                  availableScenarios.filter((s) => s.category === category)
                     .length
                 }
                 )

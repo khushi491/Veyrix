@@ -4,7 +4,8 @@ Next.js calls FastAPI through a same-origin proxy. FastAPI persists project and 
 configuration in PostgreSQL using SQLAlchemy and versioned Alembic migrations.
 PostgreSQL stores durable queued jobs; Redis provides best-effort wake-up signals.
 A separate worker claims jobs with row locks and executes bundled cases in bounded subprocesses.
-The current engine only runs a bundled deterministic parser and an in-memory mock tool.
+The engine runs a bundled deterministic parser and in-memory mock tools, locally or
+through actual MCP stdio client/server exchanges.
 It cannot load external code, connect to real payment systems, or evaluate external models.
 
 The shared Python distribution will contain engine, adapter, policy, reporting, and CLI
@@ -24,8 +25,9 @@ when the findings explorer is implemented.
 ## Boundaries
 
 Local development mode is explicitly opt-in. Hosted authentication is fail-closed and
-not implemented. Twelve synthetic security scenarios run in the background worker. The upcoming runner must use synthetic
-tools, blocked external networking, timeouts and resource limits. Neither agent output
+not implemented. Twelve local and six MCP security scenarios run in the background worker.
+The Compose runner uses synthetic tools, restricted external networking, timeouts and
+resource limits. Neither agent output
 nor MCP responses may be executed as shell commands on the host.
 
 ## References consulted
@@ -48,3 +50,14 @@ cooperative between cases and finishes an active case within its timeout.
 Compose workers run without root, with a read-only filesystem, resource limits, dropped
 capabilities, and an internal network. They can reach PostgreSQL and Redis. Local worker
 execution lacks container network isolation. Neither mode accepts arbitrary code.
+
+
+## MCP execution
+
+A run snapshots agent adapter, agent variant and bundled server enforcement variant.
+The child runner starts only `veyrix.mcp_testing.server` through the official SDK's
+stdio transport. MCP descriptions/resources/results are untrusted. Tool requests and
+responses travel through the SDK and are linked by trace sequence numbers. Server
+policy enforcement is independent from agent behavior. External endpoints, arbitrary
+commands, and third-party server code are not accepted. Timeout cleanup kills the
+runner process group, including an MCP child if it remains alive.
