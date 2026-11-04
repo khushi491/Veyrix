@@ -60,6 +60,23 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
                 == 404
             )
             assert client.post("/api/projects", json={"name": ""}).status_code == 422
+            hardened_run = client.post(f"/api/agents/{agent.json()['id']}/runs")
+            assert hardened_run.status_code == 201
+            assert hardened_run.json()["results"][0]["evaluation"]["status"] == "PASS"
+            vulnerable = client.post(
+                f"/api/projects/{project_id}/agents",
+                json={"name": "Vulnerable", "variant": "vulnerable"},
+            ).json()
+            failed_run = client.post(f"/api/agents/{vulnerable['id']}/runs").json()
+            assert failed_run["results"][0]["evaluation"]["status"] == "FAIL"
+            persisted = client.get(f"/api/runs/{failed_run['id']}").json()
+            assert persisted["results"] == failed_run["results"]
+            report = client.get(f"/api/runs/{failed_run['id']}/report")
+            assert report.status_code == 200
+            assert report.json()["run"]["id"] == failed_run["id"]
+            assert "attachment" in report.headers["content-disposition"]
+            assert persisted["configuration"]["policy"]["rules"][0]["action"] == "transfer_funds"
+
         # A fresh connection observes the committed records.
         with engine.connect() as connection:
             table = Base.metadata.tables["agents"]
@@ -69,8 +86,20 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
     finally:
         if project_id:
             with engine.begin() as connection:
-                for name in ("agents", "projects"):
+                for name in ("test_runs", "agents", "projects"):
                     table = Base.metadata.tables[name]
+                    if name == "test_runs":
+                        agent_table = Base.metadata.tables["agents"]
+                        connection.execute(
+                            table.delete().where(
+                                table.c.agent_id.in_(
+                                    agent_table.select()
+                                    .with_only_columns(agent_table.c.id)
+                                    .where(agent_table.c.project_id == project_id)
+                                )
+                            )
+                        )
+                        continue
                     column = table.c.project_id if name == "agents" else table.c.id
                     connection.execute(table.delete().where(column == project_id))
         app.dependency_overrides.clear()

@@ -30,3 +30,11 @@ class Agent(Record, Base):
     adapter: Mapped[str] = mapped_column(String(32))
     variant: Mapped[str] = mapped_column(String(32))
     policy: Mapped[dict] = mapped_column(JSON)
+
+
+class TestRun(Record, Base):
+    __tablename__ = "test_runs"
+    agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="completed")
+    configuration: Mapped[dict] = mapped_column(JSON)
+    results: Mapped[list] = mapped_column(JSON)

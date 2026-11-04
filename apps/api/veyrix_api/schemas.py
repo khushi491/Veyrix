@@ -42,3 +42,13 @@ class AgentRead(AgentCreate):
     id: str
     project_id: str
     created_at: datetime
+
+
+class RunRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    agent_id: str
+    created_at: datetime
+    status: str
+    configuration: dict
+    results: list[dict]
