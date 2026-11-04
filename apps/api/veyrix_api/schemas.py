@@ -49,6 +49,9 @@ class RunRead(BaseModel):
     id: str
     agent_id: str
     created_at: datetime
-    status: str
+    status: Literal["queued", "running", "cancelling", "cancelled", "completed", "error"]
+    started_at: datetime | None
+    finished_at: datetime | None
+    error: str | None
     configuration: dict
     results: list[dict]

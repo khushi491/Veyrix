@@ -35,6 +35,11 @@ class Agent(Record, Base):
 class TestRun(Record, Base):
     __tablename__ = "test_runs"
     agent_id: Mapped[str] = mapped_column(ForeignKey("agents.id"), index=True)
-    status: Mapped[str] = mapped_column(String(32), default="completed")
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
     configuration: Mapped[dict] = mapped_column(JSON)
     results: Mapped[list] = mapped_column(JSON)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    worker_token: Mapped[str | None] = mapped_column(String(36))
+    error: Mapped[str | None] = mapped_column(Text)

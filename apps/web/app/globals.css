@@ -658,3 +658,17 @@ summary {
     padding: 10px;
   }
 }
+
+.run-progress {
+  margin-top: 20px;
+}
+.run-progress p {
+  font-size: 12px;
+}
+.run-progress button {
+  margin-top: 12px;
+}
+.neutral {
+  color: #c2b9e5;
+  background: #28233c;
+}

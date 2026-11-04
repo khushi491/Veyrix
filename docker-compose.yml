@@ -6,6 +6,7 @@ services:
       POSTGRES_PASSWORD: veyrix_local
       POSTGRES_DB: veyrix
     ports: ["127.0.0.1:58439:5432"]
+    networks: [default, execution]
     volumes: ["postgres_data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U veyrix"]
@@ -15,10 +16,56 @@ services:
   redis:
     image: redis:7-alpine
     ports: ["127.0.0.1:6379:6379"]
+    networks: [default, execution]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
       timeout: 3s
       retries: 20
+  api:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn veyrix_api.main:app --host 0.0.0.0 --port 8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://veyrix:veyrix_local@postgres:5432/veyrix
+      REDIS_URL: redis://redis:6379/0
+      VEYRIX_DEV_MODE: "true"
+    ports: ["127.0.0.1:8000:8000"]
+    read_only: true
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  worker:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql+psycopg://veyrix:veyrix_local@postgres:5432/veyrix
+      REDIS_URL: redis://redis:6379/0
+    networks: [execution]
+    read_only: true
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    cpus: 1
+    pids_limit: 64
+    stop_grace_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 volumes:
   postgres_data:
+networks:
+  execution:
+    internal: true

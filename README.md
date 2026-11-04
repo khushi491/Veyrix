@@ -4,8 +4,7 @@ Security for Autonomous Intelligence. Break your agents before attackers do.
 
 Veyrix is an AI agent security testing platform under active development. The current
 foundation supports persistent projects, local agent registration, and one reproducible
-injection assessment with observable traces and JSON export. MCP, asynchronous execution,
-scoring, SARIF, CLI, and hosted authentication are not implemented yet.
+injection assessment with observable traces and JSON export. MCP, scoring, SARIF, CLI, and hosted authentication are not implemented yet.
 
 ## Local setup
 
@@ -24,7 +23,23 @@ uvicorn veyrix_api.main:app --host 127.0.0.1 --port 8000 --reload
 Open http://127.0.0.1:8000/docs for the API. `VEYRIX_DEV_MODE=true` grants unrestricted
 local access; bind the API to loopback only. This mode has no user authentication and
 must not be exposed publicly. Default database credentials are for local development.
-`DATABASE_URL` configures PostgreSQL; `REDIS_URL` is reserved for the upcoming worker.
+`DATABASE_URL` configures PostgreSQL; `REDIS_URL` configures worker notifications; PostgreSQL remains the durable queue.
+
+In another terminal with the same virtual environment activated:
+
+```sh
+python -m veyrix_api.worker
+```
+
+The API returns queued runs immediately. Without a worker, runs stay queued. Progress,
+cancellation, completed evidence, and errors persist in PostgreSQL. Reports become
+available when a run reaches a terminal state.
+
+For a containerized API and worker, use `docker compose --profile app up --build -d`
+instead of running the API/worker commands above. The worker has a read-only filesystem,
+limited resources, no Linux capabilities, and an internal Docker network. This restricts
+external egress but still permits database/Redis access; it is not a sandbox for arbitrary
+third-party code. Only bundled fixtures are supported.
 
 ## Checks
 
@@ -33,8 +48,15 @@ pytest
 ruff check .
 ```
 
-Integration tests use `TEST_DATABASE_URL` and a dedicated disposable database. They
-skip when it is absent; never point this variable at a database containing useful data.
+Integration tests use `TEST_DATABASE_URL` and a dedicated disposable database. For example:
+
+```sh
+docker compose exec postgres createdb -U veyrix veyrix_test
+DATABASE_URL=postgresql+psycopg://veyrix:veyrix_local@localhost:58439/veyrix_test alembic upgrade head
+TEST_DATABASE_URL=postgresql+psycopg://veyrix:veyrix_local@localhost:58439/veyrix_test pytest
+```
+
+Create the test database only once. Tests skip when TEST_DATABASE_URL is absent; never point this variable at a database containing useful data.
 
 See [development status](docs/STATUS.md) and [architecture](ARCHITECTURE.md).
 

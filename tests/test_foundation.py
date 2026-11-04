@@ -11,6 +11,7 @@ from veyrix_api.db import get_session
 from veyrix_api.main import app
 from veyrix_api.models import Base
 from veyrix_api.schemas import AgentCreate, ProjectCreate
+from veyrix_api.worker import process_one
 
 
 def test_configuration_validation():
@@ -61,13 +62,25 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             )
             assert client.post("/api/projects", json={"name": ""}).status_code == 422
             hardened_run = client.post(f"/api/agents/{agent.json()['id']}/runs")
-            assert hardened_run.status_code == 201
-            assert hardened_run.json()["results"][0]["evaluation"]["status"] == "PASS"
+            assert hardened_run.status_code == 202
+            assert hardened_run.json()["status"] == "queued"
+            assert hardened_run.json()["results"] == []
+            cancelled = client.post(f"/api/agents/{agent.json()['id']}/runs").json()
+            response = client.post(f"/api/runs/{cancelled['id']}/cancel")
+            assert response.json()["status"] == "cancelled"
+            assert response.json()["results"] == []
+            assert client.get(f"/api/runs/{hardened_run.json()['id']}/report").status_code == 409
+            assert process_one(engine)
+            hardened_result = client.get(f"/api/runs/{hardened_run.json()['id']}").json()
+            assert hardened_result["results"][0]["evaluation"]["status"] == "PASS"
             vulnerable = client.post(
                 f"/api/projects/{project_id}/agents",
                 json={"name": "Vulnerable", "variant": "vulnerable"},
             ).json()
             failed_run = client.post(f"/api/agents/{vulnerable['id']}/runs").json()
+            assert failed_run["status"] == "queued"
+            assert process_one(engine)
+            failed_run = client.get(f"/api/runs/{failed_run['id']}").json()
             assert failed_run["results"][0]["evaluation"]["status"] == "FAIL"
             persisted = client.get(f"/api/runs/{failed_run['id']}").json()
             assert persisted["results"] == failed_run["results"]

@@ -1,14 +1,16 @@
 import json
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
-from veyrix.engine import ENGINE_VERSION, SCENARIOS, run_scenario
+from veyrix.engine import ENGINE_VERSION, SCENARIO_VERSION, SCENARIOS
 
 from veyrix_api.config import settings
 from veyrix_api.db import get_session
+from veyrix_api.jobs import notify_worker
 from veyrix_api.models import Agent, Project, TestRun
 from veyrix_api.schemas import AgentCreate, AgentRead, ProjectCreate, ProjectRead, RunRead
 
@@ -75,16 +77,15 @@ def create_agent(project_id: UUID, payload: AgentCreate, db: Db) -> Agent:
 
 
 @app.post(
-    "/api/agents/{agent_id}/runs", response_model=RunRead, status_code=201, dependencies=[Local]
+    "/api/agents/{agent_id}/runs", response_model=RunRead, status_code=202, dependencies=[Local]
 )
 def execute_local_run(agent_id: UUID, db: Db) -> TestRun:
     agent = db.get(Agent, str(agent_id))
     if agent is None:
         raise HTTPException(404, "Agent not found")
-    results = [run_scenario(agent.variant, agent.policy, scenario) for scenario in SCENARIOS]
     run = TestRun(
         agent_id=agent.id,
-        status="completed",
+        status="queued",
         configuration={
             "agent_name": agent.name,
             "adapter": agent.adapter,
@@ -93,12 +94,14 @@ def execute_local_run(agent_id: UUID, db: Db) -> TestRun:
             "engine_version": ENGINE_VERSION,
             "environment": "in-memory synthetic fixture",
             "model": None,
+            "scenarios": [{"id": s.id, "version": SCENARIO_VERSION} for s in SCENARIOS],
         },
-        results=results,
+        results=[],
     )
     db.add(run)
     db.commit()
     db.refresh(run)
+    notify_worker()
     return run
 
 
@@ -127,13 +130,15 @@ def run_details(run_id: UUID, db: Db) -> TestRun:
 @app.get("/api/runs/{run_id}/report", dependencies=[Local])
 def json_report(run_id: UUID, db: Db) -> Response:
     run = run_details(run_id, db)
+    if run.status in {"queued", "running", "cancelling"}:
+        raise HTTPException(409, "Assessment is still active; export after it finishes")
     report = {
         "report_version": "0.1.0",
         "run": RunRead.model_validate(run).model_dump(mode="json"),
         "limitations": [
             "Deterministic synthetic fixture; no external model evaluated.",
             "One scenario; insufficient coverage for a security score.",
-            "Execution is synchronous; isolated container runner is not implemented.",
+            "Only bundled fixtures run in bounded subprocesses; external agent isolation is incomplete.",
         ],
     }
     return Response(
@@ -141,3 +146,18 @@ def json_report(run_id: UUID, db: Db) -> Response:
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="veyrix-{run.id}.json"'},
     )
+
+
+@app.post("/api/runs/{run_id}/cancel", response_model=RunRead, dependencies=[Local])
+def cancel_run(run_id: UUID, db: Db) -> TestRun:
+    run = db.scalar(select(TestRun).where(TestRun.id == str(run_id)).with_for_update())
+    if run is None:
+        raise HTTPException(404, "Run not found")
+    if run.status == "queued":
+        run.status = "cancelled"
+        run.finished_at = datetime.now(UTC)
+    elif run.status == "running":
+        run.status = "cancelling"
+    db.commit()
+    db.refresh(run)
+    return run

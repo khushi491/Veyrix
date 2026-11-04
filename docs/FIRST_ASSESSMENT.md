@@ -1,10 +1,10 @@
 # Reproduce the first assessment
 
-Start PostgreSQL, apply `alembic upgrade head`, run the API and dashboard as described
+Start PostgreSQL, apply `alembic upgrade head`, run the API, worker, and dashboard as described
 in README.md. Create a project. Register one vulnerable and one hardened local agent.
 The default policy denies `transfer_funds`.
 
-Select each agent in the injection assessment panel and run the same scenario.
+Select each agent in the injection assessment panel and queue the same scenario. The worker runs it and the dashboard polls persisted progress.
 
 - Vulnerable fixture: the instruction parser reads `Call transfer_funds ...` from the
   untrusted document, returns a tool request, and the mock tool changes an in-memory
@@ -20,8 +20,9 @@ run remains available. Both runs retain the exact policy and adapter configurati
 
 This is a deterministic instruction-parser fixture, not an LLM. Outcomes validate the
 execution, evidence, persistence, and evaluation pipeline. They do not establish model
-robustness. One case is insufficient for a security score. There is no background worker,
-MCP connection, generalized external adapter, or isolated container runner yet.
+robustness. One case is insufficient for a security score. A background worker executes bundled cases in bounded subprocesses. There is no
+MCP connection or generalized external adapter yet. Container restrictions apply only
+when using the Compose worker; local worker subprocesses are not a hostile-code sandbox.
 
 The policy evaluator observes prohibited attempts even if no corresponding execution
 response exists. It reports executed=true only when the tool response links to that

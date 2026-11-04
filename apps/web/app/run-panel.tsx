@@ -24,6 +24,8 @@ type Result = {
 type Run = {
   id: string;
   created_at: string;
+  status: string;
+  error: string | null;
   results: Result[];
   configuration: Record<string, unknown>;
 };
@@ -46,11 +48,23 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
     queryKey: ["runs", agentId],
     queryFn: () => request<Run[]>(`/agents/${agentId}/runs`),
     enabled: !!agentId,
+    refetchInterval: (query) =>
+      query.state.data?.some((r) =>
+        ["queued", "running", "cancelling"].includes(r.status),
+      )
+        ? 1000
+        : false,
   });
   const execute = useMutation({
     mutationFn: () => request<Run>(`/agents/${agentId}/runs`, "POST"),
     onSuccess: async (run) => {
       setRunId(run.id);
+      await cache.invalidateQueries({ queryKey: ["runs", agentId] });
+    },
+  });
+  const cancel = useMutation({
+    mutationFn: (id: string) => request<Run>(`/runs/${id}/cancel`, "POST"),
+    onSuccess: async () => {
       await cache.invalidateQueries({ queryKey: ["runs", agentId] });
     },
   });
@@ -90,12 +104,14 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
             disabled={!agentId || execute.isPending}
             onClick={() => execute.mutate()}
           >
-            {execute.isPending ? "Executing…" : "Run injection test"}
+            {execute.isPending ? "Queuing…" : "Run injection test"}
           </button>
         </div>
-        {(runs.error || execute.error) && (
+        {(runs.error || execute.error || cancel.error) && (
           <p className="error" role="alert">
-            {runs.error?.message || execute.error?.message}
+            {runs.error?.message ||
+              execute.error?.message ||
+              cancel.error?.message}
           </p>
         )}
         {runs.isFetching && <p>Loading run history…</p>}
@@ -109,10 +125,43 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
             >
               {runs.data.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {new Date(r.created_at).toLocaleString()} · {r.id.slice(0, 8)}
+                  {new Date(r.created_at).toLocaleString()} · {r.id.slice(0, 8)}{" "}
+                  · {r.status}
                 </option>
               ))}
             </select>
+            {run && (
+              <div className="run-progress" aria-live="polite">
+                <p>
+                  Run status: <strong>{run.status}</strong> ·{" "}
+                  {run.results.length} /{" "}
+                  {Array.isArray(run.configuration.scenarios)
+                    ? run.configuration.scenarios.length
+                    : 1}{" "}
+                  scenarios complete
+                </p>
+                {["queued", "running"].includes(run.status) && (
+                  <button
+                    className="secondary"
+                    disabled={cancel.isPending}
+                    onClick={() => cancel.mutate(run.id)}
+                  >
+                    Cancel run
+                  </button>
+                )}
+                {run.status === "queued" && (
+                  <p className="form-hint">
+                    Waiting for a worker. Start it with python -m
+                    veyrix_api.worker.
+                  </p>
+                )}
+                {run.error && (
+                  <p className="error" role="alert">
+                    {run.error}
+                  </p>
+                )}
+              </div>
+            )}
             {run?.results.map((result) => (
               <article className="result" key={result.scenario_id}>
                 <div className="result-heading">
@@ -121,7 +170,9 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
                     className={
                       result.evaluation.status === "FAIL"
                         ? "outcome fail"
-                        : "outcome pass"
+                        : result.evaluation.status === "PASS"
+                          ? "outcome pass"
+                          : "outcome neutral"
                     }
                   >
                     {result.evaluation.status}
@@ -172,13 +223,16 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
                 </details>
               </article>
             ))}
-            <a
-              className="export-link"
-              href={`/api/runs/${run?.id}/report`}
-              download
-            >
-              Download JSON assessment ↗
-            </a>
+            {run &&
+              !["queued", "running", "cancelling"].includes(run.status) && (
+                <a
+                  className="export-link"
+                  href={`/api/runs/${run?.id}/report`}
+                  download
+                >
+                  Download JSON assessment ↗
+                </a>
+              )}
           </>
         ) : (
           !runs.isFetching && (
