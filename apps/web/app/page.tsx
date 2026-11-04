@@ -1,23 +1,17 @@
 "use client";
 
+import { Sidebar } from "./sidebar";
+import { Providers } from "./providers";
 import { RunPanel } from "./run-panel";
 import { useState } from "react";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpRight,
-  Box,
   ChevronRight,
   CircleDot,
   Folder,
   Plus,
   Shield,
-  Terminal,
 } from "lucide-react";
 import { z } from "zod";
 
@@ -98,31 +92,7 @@ function Dashboard() {
   });
   return (
     <div className="workspace">
-      <aside>
-        <a href="/" className="brand">
-          <Shield size={25} /> VEYRIX <span>α</span>
-        </a>
-        <div className="workspace-label">
-          LOCAL WORKSPACE <CircleDot size={12} />
-        </div>
-        <nav>
-          <a href="#overview" className="active">
-            <Box size={17} /> Overview
-          </a>
-          <a href="#projects">
-            <Folder size={17} /> Projects
-          </a>
-          <a href="#agents">
-            <Shield size={17} /> Agents
-          </a>
-        </nav>
-        <div className="aside-note">
-          <Terminal size={18} />
-          <strong>Built for the boundary.</strong>
-          <p>Break your agents before attackers do.</p>
-          <span>FOUNDATION · v0.1.0</span>
-        </div>
-      </aside>
+      <Sidebar projectId={projectId} />
       <main id="overview">
         <header>
           <span>
@@ -322,7 +292,11 @@ function Dashboard() {
               )}
             </section>
           </div>
-          <RunPanel key={projectId} agents={agents.data ?? []} />
+          <RunPanel
+            key={projectId}
+            agents={agents.data ?? []}
+            projectId={projectId}
+          />
           <div className="notice">
             <CircleDot size={18} />
             <div>
@@ -397,12 +371,9 @@ function Dashboard() {
   );
 }
 export default function Page() {
-  const [client] = useState(
-    () => new QueryClient({ defaultOptions: { queries: { retry: 1 } } }),
-  );
   return (
-    <QueryClientProvider client={client}>
+    <Providers>
       <Dashboard />
-    </QueryClientProvider>
+    </Providers>
   );
 }

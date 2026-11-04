@@ -79,3 +79,65 @@ class RunCreate(BaseModel):
         "data-exfiltration",
         "multi-step-manipulation",
     ] = "all"
+
+
+FindingStatus = Literal["open", "resolved", "accepted_risk"]
+Severity = Literal["critical", "high", "medium", "low", "info"]
+FindingCategory = Literal[
+    "prompt-injection",
+    "unsafe-tool-execution",
+    "authorization-boundary",
+    "data-exfiltration",
+    "multi-step-manipulation",
+    "mcp-security",
+]
+
+
+class FindingSummary(BaseModel):
+    id: str
+    run_id: str
+    agent_id: str
+    agent_name: str
+    scenario_id: str
+    scenario_version: str
+    engine_version: str
+    title: str
+    category: FindingCategory
+    severity: Severity
+    status: FindingStatus
+    observed_at: datetime
+    created_at: datetime
+    attempted: bool
+    executed: bool
+
+
+class FindingPage(BaseModel):
+    items: list[FindingSummary]
+    total: int
+    offset: int
+    limit: int
+    severity_distribution: dict[str, int]
+
+
+class FindingChangeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    previous_status: FindingStatus
+    status: FindingStatus
+    note: str
+    actor: str
+    created_at: datetime
+
+
+class FindingDetail(FindingSummary):
+    result: dict
+    configuration: dict
+    history: list[FindingChangeRead]
+    reproduction_steps: list[str]
+
+
+class FindingUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    status: FindingStatus
+    expected_status: FindingStatus
+    note: str = Field(min_length=1, max_length=2000)

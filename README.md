@@ -5,6 +5,7 @@ Security for Autonomous Intelligence. Break your agents before attackers do.
 Veyrix is an AI agent security testing platform under active development. The current
 foundation supports persistent projects, local agent registration, and twelve versioned synthetic
 local scenarios and six real MCP stdio cases with observable traces and JSON export.
+A project-scoped findings explorer supports evidence inspection and audited triage.
 Scoring, SARIF, CLI, and hosted authentication are not implemented yet.
 
 ## Local setup
@@ -91,3 +92,20 @@ content, actual tool requests/responses, and policy decisions.
 
 Only bundled stdio servers are accepted. There is no arbitrary command, filesystem
 server, production secret or external endpoint configuration. See [MCP testing](docs/MCP.md).
+
+
+## Findings explorer
+
+Open http://127.0.0.1:3000/findings. Filter by project, severity, status, agent, category,
+and UTC dates. Inspect highlighted policy evidence, saved configuration, reproduction
+guidance, and review history. Triage requires a review note and preserves the original
+execution record. JSON reports include finding IDs and review status.
+
+To index previously executed assessments after upgrading:
+
+```sh
+python -m veyrix_api.backfill_findings
+```
+
+No attacks are rerun. Existing finding IDs and triage are preserved. See
+[findings](docs/FINDINGS.md), [API](API.md), and [testing](TESTING.md).

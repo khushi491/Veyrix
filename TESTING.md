@@ -27,7 +27,9 @@ Tests clean up the project records they create. Do not run a background worker a
 that database concurrently with the integration tests. The suite verifies API validation,
 project/agent persistence, queued runs, persisted evidence, report downloads, worker
 ownership, cancellation, timeout handling, expired leases, and actual MCP client/server
-exchanges. Redis notifications are best-effort; PostgreSQL owns queue durability.
+exchanges. Findings tests verify evidence replay, rejected unsupported claims, project
+scope, literal search, dates, pagination, immutable evidence, stale triage conflicts,
+review history and idempotent indexing. Redis notifications are best-effort; PostgreSQL owns queue durability.
 
 ## Frontend
 

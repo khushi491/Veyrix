@@ -1,6 +1,5 @@
 import json
 from datetime import UTC, datetime
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Response
@@ -9,10 +8,11 @@ from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION, SCENARIOS, select_scenarios
 from veyrix.engine.catalog import MCP_SCENARIOS
 
-from veyrix_api.config import settings
-from veyrix_api.db import get_session
+from veyrix_api.dependencies import Db, local_access
+from veyrix_api.finding_routes import router as finding_router
+from veyrix_api.finding_routes import summary as finding_summary
 from veyrix_api.jobs import notify_worker
-from veyrix_api.models import Agent, Project, TestRun
+from veyrix_api.models import Agent, Finding, Project, TestRun
 from veyrix_api.schemas import (
     AgentCreate,
     AgentRead,
@@ -23,14 +23,7 @@ from veyrix_api.schemas import (
 )
 
 app = FastAPI(title="Veyrix API", version="0.1.0")
-Db = Annotated[Session, Depends(get_session)]
-
-
-def local_access() -> None:
-    if not settings.veyrix_dev_mode:
-        raise HTTPException(
-            503, "Hosted authentication is not implemented; enable local development mode"
-        )
+app.include_router(finding_router)
 
 
 Local = Depends(local_access)
@@ -148,7 +141,18 @@ def json_report(run_id: UUID, db: Db) -> Response:
     if run.status in {"queued", "running", "cancelling"}:
         raise HTTPException(409, "Assessment is still active; export after it finishes")
     report = {
-        "report_version": "0.1.0",
+        "report_version": "0.2.0",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "findings": [
+            finding_summary(*row).model_dump(mode="json")
+            for row in db.execute(
+                select(Finding, TestRun, Agent)
+                .join(TestRun, Finding.run_id == TestRun.id)
+                .join(Agent, TestRun.agent_id == Agent.id)
+                .where(TestRun.id == run.id)
+                .order_by(Finding.observed_at, Finding.id)
+            )
+        ],
         "run": RunRead.model_validate(run).model_dump(mode="json"),
         "limitations": [
             "Deterministic synthetic fixture; no external model evaluated.",

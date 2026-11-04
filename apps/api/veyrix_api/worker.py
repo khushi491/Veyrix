@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION
 
 from veyrix_api.db import engine
+from veyrix_api.findings import persist_finding
 from veyrix_api.jobs import WAKE_KEY, redis_client
 from veyrix_api.models import TestRun
 
@@ -103,6 +104,7 @@ def update_owned(
             return False
         if result is not None:
             run.results = [*run.results, result]
+            persist_finding(db, run, result)
         if run.status == "cancelling":
             run.status = "cancelled"
             finish = True
@@ -136,8 +138,12 @@ def process_one(db_engine: Engine = engine) -> bool:
             if not update_owned(db_engine, run_id, token):
                 return True
             result = execute_scenario(configuration, scenario["id"])
-            if result["scenario_version"] != scenario["version"]:
-                raise ValueError("Scenario version differs from queued configuration")
+            if (
+                result["scenario_version"] != scenario["version"]
+                or result["scenario_id"] != scenario["id"]
+                or result["engine_version"] != configuration["engine_version"]
+            ):
+                raise ValueError("Runner identity differs from queued configuration")
             if not update_owned(db_engine, run_id, token, result=result):
                 return True
         update_owned(db_engine, run_id, token, finish=True)

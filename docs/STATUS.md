@@ -16,6 +16,9 @@ Tasks are committed and pushed individually after verification.
 6. MCP: official SDK stdio client, six versioned scenarios, tool discovery and resources,
    vulnerable and policy-enforcing servers, independently configurable agent behavior,
    SDK/protocol metadata and actual transport evidence.
-7. Next: findings explorer, scoring, SARIF/CLI and release docs.
+7. Findings explorer: transactional verified evidence indexing, project-scoped search
+   and filters, pagination, dedicated dashboard view, evidence timelines, reproducibility
+   details, immutable source results, audited triage and idempotent historical indexing.
+8. Next: transparent scoring, SARIF/CLI and release docs.
 
 No security scores, findings, or agent execution results are fabricated.

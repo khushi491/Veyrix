@@ -19,8 +19,8 @@ agent policies are validated JSON, and agent project references are indexed. Que
 are currently bounded to 100 records; cursor pagination is a future task.
 
 Run snapshots persist configuration, scenario and engine versions, results, and ordered
-trace events as JSON. Separate relational result and finding models will be introduced
-when the findings explorer is implemented.
+trace events as JSON. Findings reference source runs through foreign keys; result snapshots remain JSON.
+Finding triage changes live in a separate append-only history table.
 
 ## Boundaries
 
@@ -61,3 +61,16 @@ responses travel through the SDK and are linked by trace sequence numbers. Serve
 policy enforcement is independent from agent behavior. External endpoints, arbitrary
 commands, and third-party server code are not accepted. Timeout cleanup kills the
 runner process group, including an MCP child if it remains alive.
+
+
+## Finding persistence
+
+The worker re-evaluates FAIL traces against the run policy and saves each verified
+finding in the same transaction as its source result. Run/scenario uniqueness prevents
+duplicate indexing. Reads join source runs and agents to enforce project scope; the
+local mode still lacks hosted identity/membership authorization. Triage uses row locks
+and an expected-status precondition and never updates evidence. Historical indexing is
+explicit, idempotent, and derives findings only from saved execution evidence.
+
+Compose uses a one-shot migration service; API and worker startup both wait for its
+successful completion so new schema-dependent jobs cannot run before migrations.

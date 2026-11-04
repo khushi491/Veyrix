@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from veyrix_api.config import settings
 from veyrix_api.db import get_session
@@ -75,6 +75,7 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             hardened_result = client.get(f"/api/runs/{hardened_run.json()['id']}").json()
             assert len(hardened_result["results"]) == 12
             assert all(r["evaluation"]["status"] == "PASS" for r in hardened_result["results"])
+            assert client.get(f"/api/projects/{project_id}/findings").json()["total"] == 0
             vulnerable = client.post(
                 f"/api/projects/{project_id}/agents",
                 json={"name": "Vulnerable", "variant": "vulnerable"},
@@ -90,6 +91,10 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             report = client.get(f"/api/runs/{failed_run['id']}/report")
             assert report.status_code == 200
             assert report.json()["run"]["id"] == failed_run["id"]
+            assert len(report.json()["findings"]) == 12
+            findings = client.get(f"/api/projects/{project_id}/findings").json()
+            assert findings["total"] == 12
+            assert sum(f["executed"] for f in findings["items"]) == 11
             assert "attachment" in report.headers["content-disposition"]
             assert persisted["configuration"]["policy"]["rules"][0]["action"] == "transfer_funds"
             mcp_agent = client.post(
@@ -114,6 +119,7 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert process_one(engine)
             mcp_result = client.get(f"/api/runs/{mcp_run['id']}").json()
             assert mcp_result["status"] == "completed"
+            assert client.get(f"/api/projects/{project_id}/findings").json()["total"] == 18
             assert len(mcp_result["results"]) == 6
             assert all(
                 r["evaluation"]["attempted"] and not r["evaluation"]["executed"]
@@ -129,6 +135,20 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
     finally:
         if project_id:
             with engine.begin() as connection:
+                run_table = Base.metadata.tables["test_runs"]
+                agent_table = Base.metadata.tables["agents"]
+                finding_table = Base.metadata.tables["findings"]
+                run_ids = (
+                    select(run_table.c.id)
+                    .join(agent_table, run_table.c.agent_id == agent_table.c.id)
+                    .where(agent_table.c.project_id == project_id)
+                )
+                finding_ids = select(finding_table.c.id).where(finding_table.c.run_id.in_(run_ids))
+                changes = Base.metadata.tables["finding_status_changes"]
+                connection.execute(changes.delete().where(changes.c.finding_id.in_(finding_ids)))
+                connection.execute(
+                    finding_table.delete().where(finding_table.c.run_id.in_(run_ids))
+                )
                 for name in ("test_runs", "agents", "projects"):
                     table = Base.metadata.tables[name]
                     if name == "test_runs":

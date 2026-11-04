@@ -3,10 +3,10 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION, SCENARIO_VERSION, SCENARIOS
-from veyrix_api.models import Agent, Project
+from veyrix_api.models import Agent, Finding, FindingStatusChange, Project
 from veyrix_api.models import TestRun as Run
 from veyrix_api.worker import claim_next, process_one, recover_interrupted, update_owned
 
@@ -48,6 +48,11 @@ def queued_run():
         yield engine, ids[2]
     finally:
         with Session(engine) as db:
+            finding_ids = select(Finding.id).where(Finding.run_id == ids[2])
+            db.execute(
+                delete(FindingStatusChange).where(FindingStatusChange.finding_id.in_(finding_ids))
+            )
+            db.execute(delete(Finding).where(Finding.run_id == ids[2]))
             for model, record_id in [(Run, ids[2]), (Agent, ids[1]), (Project, ids[0])]:
                 db.delete(db.get(model, record_id))
             db.commit()
@@ -88,7 +93,12 @@ def test_cancellation_stops_following_scenarios(queued_run, monkeypatch):
             run = db.get(Run, run_id)
             run.status = "cancelling"
             db.commit()
-        return {"scenario_version": SCENARIO_VERSION, "observed": True}
+        return {
+            "scenario_version": SCENARIO_VERSION,
+            "scenario_id": args[1],
+            "engine_version": ENGINE_VERSION,
+            "observed": True,
+        }
 
     monkeypatch.setattr("veyrix_api.worker.execute_scenario", cancelling_runner)
     assert process_one(engine)

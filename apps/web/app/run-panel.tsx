@@ -53,7 +53,13 @@ async function request<T>(
     );
   return response.json() as Promise<T>;
 }
-export function RunPanel({ agents }: { agents: Agent[] }) {
+export function RunPanel({
+  agents,
+  projectId,
+}: {
+  agents: Agent[];
+  projectId: string;
+}) {
   const [suite, setSuite] = useState("all");
   const catalog = useQuery({
     queryKey: ["suites"],
@@ -283,6 +289,19 @@ export function RunPanel({ agents }: { agents: Agent[] }) {
                 </details>
               </article>
             ))}
+            {run &&
+              run.results.some(
+                (result) => result.evaluation.status === "FAIL",
+              ) && (
+                <p className="finding-explorer-link">
+                  <a
+                    className="export-link"
+                    href={`/findings?project=${projectId}`}
+                  >
+                    Open project findings and evidence ↗
+                  </a>
+                </p>
+              )}
             {run &&
               !["queued", "running", "cancelling"].includes(run.status) && (
                 <a

@@ -22,12 +22,27 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  migrate:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://veyrix:veyrix_local@postgres:5432/veyrix
+    read_only: true
+    tmpfs: ["/tmp:size=32m,noexec,nosuid"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      postgres:
+        condition: service_healthy
   api:
     profiles: [app]
     build:
       context: .
       dockerfile: infra/Dockerfile.api
-    command: ["sh", "-c", "alembic upgrade head && exec uvicorn veyrix_api.main:app --host 0.0.0.0 --port 8000"]
+    command: ["uvicorn", "veyrix_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       DATABASE_URL: postgresql+psycopg://veyrix:veyrix_local@postgres:5432/veyrix
       REDIS_URL: redis://redis:6379/0
@@ -42,6 +57,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
   worker:
     profiles: [app]
     build:
@@ -64,6 +81,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 volumes:
   postgres_data:
 networks:
