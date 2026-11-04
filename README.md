@@ -8,7 +8,7 @@ MCP integration, scoring, reports, and hosted authentication are not implemented
 
 ## Local setup
 
-Requires Python 3.12+, Node 20.9+, Docker Compose, and available ports 58439 and 6379.
+Requires Python 3.12+, Node 22+, Docker Compose, and available ports 58439 and 6379.
 
 ```sh
 cp .env.example .env
@@ -36,3 +36,19 @@ Integration tests use `TEST_DATABASE_URL` and a dedicated disposable database. T
 skip when it is absent; never point this variable at a database containing useful data.
 
 See [development status](docs/STATUS.md) and [architecture](ARCHITECTURE.md).
+
+## Dashboard
+
+In a second terminal, with the API running on port 8000:
+
+```sh
+cd apps/web
+npm ci
+npm run dev
+```
+
+Open http://127.0.0.1:3000. The same-origin `/api` proxy forwards requests to the local
+API. Create a project, then register a hardened or vulnerable local agent configuration.
+The dashboard does not display simulated findings or security scores.
+
+Frontend checks: `npm run typecheck`, `npm run build`, and `npm audit` from `apps/web`.
