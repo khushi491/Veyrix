@@ -1,5 +1,6 @@
 """Scoped assessment scores; no aggregation across incompatible configurations."""
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -61,7 +62,9 @@ def agent_scores(project_id: UUID, agent_id: UUID, db: Db) -> dict:
             .limit(20)
         )
         history.extend(assessment_entry(db, run) for run in runs if run.id != latest.id)
-    history = sorted(history, key=lambda item: (item["created_at"], item["run_id"]))[-20:]
+    history = sorted(
+        history, key=lambda item: (datetime.fromisoformat(item["created_at"]), item["run_id"])
+    )[-20:]
     return {
         "agent_id": agent.id,
         "agent_name": agent.name,

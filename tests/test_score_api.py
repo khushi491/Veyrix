@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -216,3 +217,16 @@ def test_score_endpoints_require_explicit_local_access(score_data, monkeypatch):
         ).status_code
         == 503
     )
+
+
+def test_history_orders_instants_with_different_fractional_precision(score_data):
+    client, engine, projects, agents, runs = score_data
+    whole_second = datetime(2026, 11, 5, 12, tzinfo=UTC)
+    with Session(engine) as db:
+        db.get(Run, runs[0]).created_at = whole_second
+        db.get(Run, runs[1]).created_at = whole_second + timedelta(microseconds=1)
+        db.commit()
+    response = client.get(f"/api/projects/{projects[0]}/scores", params={"agent_id": agents[0]})
+    assert response.status_code == 200
+    assert response.json()["latest"]["run_id"] == runs[1]
+    assert [entry["run_id"] for entry in response.json()["history"]] == runs[:2]
