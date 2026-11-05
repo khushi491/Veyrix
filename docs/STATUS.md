@@ -19,6 +19,9 @@ Tasks are committed and pushed individually after verification.
 7. Findings explorer: transactional verified evidence indexing, project-scoped search
    and filters, pagination, dedicated dashboard view, evidence timelines, reproducibility
    details, immutable source results, audited triage and idempotent historical indexing.
-8. Next: transparent scoring, SARIF/CLI and release docs.
+8. Versioned scoring: full-catalog coverage gates, deterministic evidence replay,
+   severity/authorization weights, execution distinctions and caps, immutable score
+   snapshots, comparable-scope history, dashboard breakdowns and JSON report metadata.
+9. Next: SARIF/CLI, developer CI integration and release docs.
 
 No security scores, findings, or agent execution results are fabricated.

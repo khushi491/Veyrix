@@ -1,5 +1,6 @@
 "use client";
 
+import { RunScore } from "./security-score";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -224,8 +225,13 @@ export function RunPanel({
                 )}
               </div>
             )}
+            {run && <RunScore runId={run.id} status={run.status} />}
             {run?.results.map((result) => (
-              <article className="result" key={result.scenario_id}>
+              <article
+                className="result"
+                key={result.scenario_id}
+                id={`result-${run.id}-${result.scenario_id}`}
+              >
                 <div className="result-heading">
                   <h3>{result.title}</h3>
                   <span

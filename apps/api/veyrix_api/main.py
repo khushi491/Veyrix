@@ -3,10 +3,12 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION, SCENARIOS, select_scenarios
 from veyrix.engine.catalog import MCP_SCENARIOS
+from veyrix.scoring import scoring_manifest
 
 from veyrix_api.dependencies import Db, local_access
 from veyrix_api.finding_routes import router as finding_router
@@ -21,9 +23,12 @@ from veyrix_api.schemas import (
     RunCreate,
     RunRead,
 )
+from veyrix_api.score_routes import router as score_router
+from veyrix_api.scoring import assessment_entry, persist_score
 
 app = FastAPI(title="Veyrix API", version="0.1.0")
 app.include_router(finding_router)
+app.include_router(score_router)
 
 
 Local = Depends(local_access)
@@ -103,6 +108,7 @@ def execute_local_run(agent_id: UUID, db: Db, payload: RunCreate | None = None) 
             "model": None,
             "suite": suite,
             "scenarios": [{"id": s.id, "version": s.version} for s in selected],
+            "scoring": scoring_manifest(select_scenarios("all", agent.adapter)),
         },
         results=[],
     )
@@ -141,7 +147,8 @@ def json_report(run_id: UUID, db: Db) -> Response:
     if run.status in {"queued", "running", "cancelling"}:
         raise HTTPException(409, "Assessment is still active; export after it finishes")
     report = {
-        "report_version": "0.2.0",
+        "report_version": "0.3.0",
+        "security_assessment": assessment_entry(db, run),
         "generated_at": datetime.now(UTC).isoformat(),
         "findings": [
             finding_summary(*row).model_dump(mode="json")
@@ -161,7 +168,7 @@ def json_report(run_id: UUID, db: Db) -> Response:
         ],
     }
     return Response(
-        json.dumps(report, indent=2),
+        json.dumps(jsonable_encoder(report), indent=2),
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="veyrix-{run.id}.json"'},
     )
@@ -175,6 +182,7 @@ def cancel_run(run_id: UUID, db: Db) -> TestRun:
     if run.status == "queued":
         run.status = "cancelled"
         run.finished_at = datetime.now(UTC)
+        persist_score(db, run)
     elif run.status == "running":
         run.status = "cancelling"
     db.commit()

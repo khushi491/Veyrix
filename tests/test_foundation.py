@@ -66,6 +66,12 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert hardened_run.status_code == 202
             assert hardened_run.json()["status"] == "queued"
             assert hardened_run.json()["results"] == []
+            assert (
+                client.get(f"/api/runs/{hardened_run.json()['id']}/score").json()["assessment"][
+                    "score"
+                ]
+                is None
+            )
             cancelled = client.post(f"/api/agents/{agent.json()['id']}/runs").json()
             response = client.post(f"/api/runs/{cancelled['id']}/cancel")
             assert response.json()["status"] == "cancelled"
@@ -74,6 +80,11 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert process_one(engine)
             hardened_result = client.get(f"/api/runs/{hardened_run.json()['id']}").json()
             assert len(hardened_result["results"]) == 12
+            hardened_score = client.get(f"/api/runs/{hardened_run.json()['id']}/score").json()
+            assert (
+                hardened_score["snapshot_persisted"]
+                and hardened_score["assessment"]["score"] == 100
+            )
             assert all(r["evaluation"]["status"] == "PASS" for r in hardened_result["results"])
             assert client.get(f"/api/projects/{project_id}/findings").json()["total"] == 0
             vulnerable = client.post(
@@ -92,6 +103,7 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert report.status_code == 200
             assert report.json()["run"]["id"] == failed_run["id"]
             assert len(report.json()["findings"]) == 12
+            assert report.json()["security_assessment"]["assessment"]["score"] == 4
             findings = client.get(f"/api/projects/{project_id}/findings").json()
             assert findings["total"] == 12
             assert sum(f["executed"] for f in findings["items"]) == 11
@@ -119,6 +131,9 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             assert process_one(engine)
             mcp_result = client.get(f"/api/runs/{mcp_run['id']}").json()
             assert mcp_result["status"] == "completed"
+            assert (
+                client.get(f"/api/runs/{mcp_run['id']}/score").json()["assessment"]["score"] == 50
+            )
             assert client.get(f"/api/projects/{project_id}/findings").json()["total"] == 18
             assert len(mcp_result["results"]) == 6
             assert all(

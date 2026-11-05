@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION, SCENARIO_VERSION, SCENARIOS
-from veyrix_api.models import Agent, Finding, FindingStatusChange, Project
+from veyrix_api.models import Agent, Finding, FindingStatusChange, Project, RunScore
 from veyrix_api.models import TestRun as Run
 from veyrix_api.worker import claim_next, process_one, recover_interrupted, update_owned
 
@@ -83,6 +83,8 @@ def test_expired_worker_does_not_replay_or_overwrite(queued_run):
         run = db.get(Run, run_id)
         assert run.status == "error" and run.results == []
         assert "interrupted" in run.error
+        score = db.scalar(select(RunScore).where(RunScore.run_id == run_id))
+        assert score is not None and score.score is None
 
 
 def test_cancellation_stops_following_scenarios(queued_run, monkeypatch):
@@ -121,3 +123,5 @@ def test_timeout_is_an_error_not_a_security_pass(queued_run, monkeypatch):
         run = db.get(Run, run_id)
         assert run.status == "error" and run.results == []
         assert "timeout" in run.error
+        score = db.scalar(select(RunScore).where(RunScore.run_id == run_id))
+        assert score is not None and score.score is None

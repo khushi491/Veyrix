@@ -74,3 +74,18 @@ explicit, idempotent, and derives findings only from saved execution evidence.
 
 Compose uses a one-shot migration service; API and worker startup both wait for its
 successful completion so new schema-dependent jobs cannot run before migrations.
+
+
+## Versioned scoring
+
+New runs freeze the complete adapter catalog and methodology in configuration JSON.
+`veyrix.scoring` verifies result evidence, evaluates full-catalog coverage, and applies
+published weights and severity caps using exact fractions. Terminal run updates, queued
+cancellation and interrupted-run recovery save a `run_scores` snapshot transactionally.
+Run/method uniqueness and idempotent persistence preserve the original assessment.
+
+Score reads return saved snapshots or read-only previews. Legacy runs without a saved
+catalog remain unscored. Scope fingerprints include policy, adapter/server variants,
+engine and actual runtime versions, selected cases and the full saved catalog. Trends
+combine only matching scopes. Findings triage is independent of source scores. The
+frontend uses Recharts for real comparable-run history and preserves unscored gaps.

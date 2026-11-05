@@ -15,6 +15,9 @@ With development mode disabled, protected endpoints return HTTP 503.
 | GET | `/api/agents/{agent_id}/runs` | Recent persisted assessments |
 | GET | `/api/runs/{run_id}` | State, configuration snapshot, and completed results |
 | POST | `/api/runs/{run_id}/cancel` | Cancel a queued run or request cooperative cancellation |
+| GET | `/api/runs/{run_id}/score` | Assessment score, scope and calculation; no mutation on read |
+| GET | `/api/projects/{project_id}/scores?agent_id={agent_id}` | Latest agent assessment and matching-scope history |
+| GET | `/api/scoring/methodology` | Published scoring v1.0.0 formula, gates and caps |
 | GET | `/api/runs/{run_id}/report` | Download JSON report; HTTP 409 while active |
 | GET | `/api/projects/{project_id}/findings` | Filtered, paginated verified findings |
 | GET | `/api/projects/{project_id}/findings/{finding_id}` | Original evidence, configuration and review history |
@@ -60,6 +63,25 @@ non-whitespace characters after trimming. Evidence, severity, and source configu
 cannot be changed through this endpoint. Same-status requests do not create duplicate
 history. Local review attribution is the fixed `local-developer` label.
 
-JSON reports version 0.2.0 include generation time and finding summaries alongside the
-original run results. Finding status reflects the review state at export time; the
+JSON reports version 0.3.0 include generation time, finding summaries and a versioned
+`security_assessment` alongside the original run results. Finding status reflects the review state at export time; the
 assessment outcome remains the original observation. PDF and SARIF are not implemented.
+
+
+## Score responses
+
+`GET /api/runs/{run_id}/score` returns `run_id`, `agent_id`, `created_at`, `run_status`,
+`snapshot_persisted` and `assessment`. A null assessment score means insufficient or
+unsupported scope; inspect its `reasons` and `integrity_issues`. Active previews are not
+saved snapshots. Legacy assessments remain unscored when the saved catalog is absent.
+
+The assessment includes counts for PASS/FAIL/INCONCLUSIVE/ERROR/NOT_TESTED, full catalog
+coverage, verified severity distribution, authorization request counts, observed execution
+outcomes, per-case loss weights, evidence references, scope fingerprint, actual runtime
+versions, and the methodology. Numeric scores require a completed run, at least 5 verified
+cases, and 80% full-catalog coverage. See [SCORING.md](SCORING.md).
+
+Project score history requires an agent in the specified project; mismatches return 404.
+Only matching method/configuration/catalog/runtime scopes appear together in the history.
+A new pending run is returned as the latest unscored assessment even when previous runs
+have numeric scores. Up to 20 matching assessments are returned in chronological order.

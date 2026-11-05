@@ -19,6 +19,7 @@ from veyrix_api.db import engine
 from veyrix_api.findings import persist_finding
 from veyrix_api.jobs import WAKE_KEY, redis_client
 from veyrix_api.models import TestRun
+from veyrix_api.scoring import persist_score
 
 logger = logging.getLogger(__name__)
 LEASE_SECONDS = 60
@@ -68,6 +69,7 @@ def recover_interrupted(db_engine: Engine) -> None:
             run.finished_at = now
             run.worker_token = None
             run.lease_expires_at = None
+            persist_score(db, run)
         db.commit()
 
 
@@ -118,6 +120,7 @@ def update_owned(
             run.finished_at = datetime.now(UTC)
             run.worker_token = None
             run.lease_expires_at = None
+            persist_score(db, run)
         else:
             run.lease_expires_at = datetime.now(UTC) + timedelta(seconds=LEASE_SECONDS)
         db.commit()

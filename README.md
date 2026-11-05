@@ -6,7 +6,8 @@ Veyrix is an AI agent security testing platform under active development. The cu
 foundation supports persistent projects, local agent registration, and twelve versioned synthetic
 local scenarios and six real MCP stdio cases with observable traces and JSON export.
 A project-scoped findings explorer supports evidence inspection and audited triage.
-Scoring, SARIF, CLI, and hosted authentication are not implemented yet.
+Versioned security scoring includes coverage gates, evidence-backed penalties and comparable history.
+SARIF, CLI, and hosted authentication are not implemented yet.
 
 ## Local setup
 
@@ -76,7 +77,8 @@ Open http://127.0.0.1:3000. The same-origin `/api` proxy forwards requests to th
 API. Create a project, then register a hardened or vulnerable local agent configuration.
 Run an injection assessment to compare vulnerable and hardened deterministic fixtures.
 The dashboard shows actual in-memory mock tool execution; no external LLM is evaluated.
-Select all scenarios or a category-specific suite. No numeric security score is implemented yet.
+Select all scenarios or a category-specific suite. Scoring requires at least five determinate
+cases and 80% coverage of the full saved adapter catalog.
 Existing agent policies remain unchanged; tests without an applicable rule yield INCONCLUSIVE.
 
 Frontend checks: `npm run typecheck`, `npm run build`, and `npm audit` from `apps/web`.
@@ -109,3 +111,15 @@ python -m veyrix_api.backfill_findings
 
 No attacks are rerun. Existing finding IDs and triage are preserved. See
 [findings](docs/FINDINGS.md), [API](API.md), and [testing](TESTING.md).
+
+
+## Scoped security scores
+
+The overview and test runner show a versioned assessment score, outcome counts, severity
+breakdown, coverage and per-case loss weights. Inspect the methodology disclosure or
+[SCORING.md](SCORING.md) for the exact formula and caps. Scores and their method are
+included in JSON reports. Findings triage does not change saved scores.
+
+Run a **fresh full suite** after upgrading to record a scoring catalog. Older runs stay
+unscored; their configuration is preserved. Current scores describe synthetic fixtures
+and do not certify production agents or external models.

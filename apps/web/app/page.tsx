@@ -1,5 +1,6 @@
 "use client";
 
+import { ScoreOverview } from "./security-score";
 import { Sidebar } from "./sidebar";
 import { Providers } from "./providers";
 import { RunPanel } from "./run-panel";
@@ -68,6 +69,13 @@ function Dashboard() {
     queryFn: () => api<Agent[]>(`/projects/${projectId}/agents`),
     enabled: !!projectId,
   });
+  const findingCount = useQuery({
+    queryKey: ["overview-findings", projectId],
+    queryFn: () =>
+      api<{ total: number }>(`/projects/${projectId}/findings?limit=1`),
+    enabled: !!projectId,
+    refetchInterval: 5000,
+  });
   const createProject = useMutation({
     mutationFn: (body: z.infer<typeof projectInput>) =>
       api<Project>("/projects", body),
@@ -127,19 +135,20 @@ function Dashboard() {
               <small>Local adapter configurations</small>
             </article>
             <article>
-              <span>Security assessment</span>
-              <strong className="unscored">Insufficient coverage</strong>
-              <small>Synthetic fixtures; no numeric score</small>
+              <span>Verified findings in project</span>
+              <strong>{findingCount.data?.total ?? "—"}</strong>
+              <small>Observed violations across test runs</small>
             </article>
           </div>
-          {(projects.error || agents.error) && (
+          {(projects.error || agents.error || findingCount.error) && (
             <div role="alert" className="error">
-              {(projects.error || agents.error)?.message}
+              {(projects.error || agents.error || findingCount.error)?.message}
               <button
                 className="secondary"
                 onClick={() => {
                   void projects.refetch();
                   void agents.refetch();
+                  void findingCount.refetch();
                 }}
               >
                 Retry
@@ -292,6 +301,11 @@ function Dashboard() {
               )}
             </section>
           </div>
+          <ScoreOverview
+            key={`scores-${projectId}`}
+            projectId={projectId}
+            agents={agents.data ?? []}
+          />
           <RunPanel
             key={projectId}
             agents={agents.data ?? []}

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -70,3 +70,15 @@ class FindingStatusChange(Record, Base):
     status: Mapped[str] = mapped_column(String(32))
     note: Mapped[str] = mapped_column(Text)
     actor: Mapped[str] = mapped_column(String(120), default="local-developer")
+
+
+class RunScore(Record, Base):
+    __tablename__ = "run_scores"
+    __table_args__ = (
+        UniqueConstraint("run_id", "methodology_version", name="uq_run_score_methodology"),
+    )
+    run_id: Mapped[str] = mapped_column(ForeignKey("test_runs.id", ondelete="CASCADE"), index=True)
+    methodology_version: Mapped[str] = mapped_column(String(32))
+    scope_fingerprint: Mapped[str | None] = mapped_column(String(64), index=True)
+    score: Mapped[int | None] = mapped_column(Integer)
+    assessment: Mapped[dict] = mapped_column(JSON)

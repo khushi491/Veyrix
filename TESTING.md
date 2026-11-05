@@ -29,7 +29,9 @@ project/agent persistence, queued runs, persisted evidence, report downloads, wo
 ownership, cancellation, timeout handling, expired leases, and actual MCP client/server
 exchanges. Findings tests verify evidence replay, rejected unsupported claims, project
 scope, literal search, dates, pagination, immutable evidence, stale triage conflicts,
-review history and idempotent indexing. Redis notifications are best-effort; PostgreSQL owns queue durability.
+review history and idempotent indexing. Scoring tests cover coverage gates, duplicate
+results, forged outcomes, runtime/scope changes, exact weights, severity caps, immutable
+snapshots, triage independence, report serialization and pending/legacy assessments. Redis notifications are best-effort; PostgreSQL owns queue durability.
 
 ## Frontend
 

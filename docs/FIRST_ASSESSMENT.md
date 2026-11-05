@@ -21,8 +21,8 @@ run remains available. Both runs retain the exact policy and adapter configurati
 
 This is a deterministic instruction-parser fixture, not an LLM. Outcomes validate the
 execution, evidence, persistence, and evaluation pipeline. They do not establish model
-robustness. These twelve cases are pipeline checks, not a model benchmark. Numeric
-scoring is not implemented yet. A worker executes bundled cases in bounded subprocesses.
+robustness. These twelve cases are pipeline checks, not a model benchmark. New full-suite runs receive a scoped score when coverage gates pass. Older runs without
+a saved scoring catalog remain unscored. See SCORING.md for the method and its limits. A worker executes bundled cases in bounded subprocesses.
 MCP uses the official SDK and bundled local stdio servers; generalized external adapters
 are not implemented yet. Container restrictions apply only
 when using the Compose worker; local worker subprocesses are not a hostile-code sandbox.

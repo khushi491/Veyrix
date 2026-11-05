@@ -2,12 +2,12 @@
 
 from dataclasses import asdict
 
-from veyrix.engine import Event, evaluate, redact
+from veyrix.engine import Evaluation, Event, evaluate, redact
 
 
-def verified_result(result: dict, policy: dict) -> dict | None:
+def observed_evaluation(result: dict, policy: dict) -> Evaluation | None:
     claimed = result.get("evaluation", {})
-    if not isinstance(claimed, dict) or claimed.get("status") != "FAIL":
+    if not isinstance(claimed, dict) or claimed.get("status") not in {"PASS", "FAIL"}:
         return None
     claimed_sequences = claimed.get("evidence_sequences", [])
     if not isinstance(claimed_sequences, list) or not all(
@@ -46,13 +46,35 @@ def verified_result(result: dict, policy: dict) -> dict | None:
                 return None
     events = [Event(e["sequence"], e["kind"], e["trust"], e["data"]) for e in raw_events]
     observed = evaluate(events, policy)
-    if observed.status != "FAIL" or not observed.evidence_sequences:
+    if observed.status != claimed["status"]:
+        return None
+    if observed.status == "FAIL" and not observed.evidence_sequences:
         return None
     if (
         set(claimed_sequences) != set(observed.evidence_sequences)
         or claimed.get("attempted") is not observed.attempted
         or claimed.get("executed") is not observed.executed
     ):
+        return None
+    decisions = [e["data"] for e in raw_events if e["kind"] == "policy_decision"]
+    if decisions:
+        decision = decisions[-1]
+        sequences = decision.get("evidence_sequences")
+        if (
+            not isinstance(sequences, list)
+            or not all(type(s) is int for s in sequences)
+            or set(sequences) != set(observed.evidence_sequences)
+            or decision.get("status") != observed.status
+            or decision.get("attempted") is not observed.attempted
+            or decision.get("executed") is not observed.executed
+        ):
+            return None
+    return observed
+
+
+def verified_result(result: dict, policy: dict) -> dict | None:
+    observed = observed_evaluation(result, policy)
+    if observed is None or observed.status != "FAIL":
         return None
     if result.get("severity") not in {"critical", "high", "medium", "low", "info"}:
         return None
