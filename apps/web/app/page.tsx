@@ -4,6 +4,8 @@ import { ScoreOverview } from "./security-score";
 import { Sidebar } from "./sidebar";
 import { Providers } from "./providers";
 import { RunPanel } from "./run-panel";
+import { api } from "./api-client";
+import { demoMode, readOnlyNote } from "./demo-mode";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -32,27 +34,6 @@ const projectInput = z.object({
   name: z.string().trim().min(1, "Enter a name").max(120),
   description: z.string().max(2000),
 });
-async function api<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(
-    `/api${path}`,
-    body
-      ? {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      : undefined,
-  );
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-    throw new Error(
-      typeof data?.detail === "string"
-        ? data.detail
-        : `Request failed (${response.status}). Check that the API is running.`,
-    );
-  }
-  return response.json() as Promise<T>;
-}
 function Dashboard() {
   const cache = useQueryClient();
   const [selected, setSelected] = useState<string>("");
@@ -74,11 +55,11 @@ function Dashboard() {
     queryFn: () =>
       api<{ total: number }>(`/projects/${projectId}/findings?limit=1`),
     enabled: !!projectId,
-    refetchInterval: 5000,
+    refetchInterval: demoMode ? false : 5000,
   });
   const createProject = useMutation({
     mutationFn: (body: z.infer<typeof projectInput>) =>
-      api<Project>("/projects", body),
+      api<Project>("/projects", { method: "POST", body }),
     onSuccess: async (p) => {
       await cache.invalidateQueries({ queryKey: ["projects"] });
       setSelected(p.id);
@@ -92,7 +73,7 @@ function Dashboard() {
       variant: string;
       adapter: string;
       server_variant: string;
-    }) => api<Agent>(`/projects/${projectId}/agents`, body),
+    }) => api<Agent>(`/projects/${projectId}/agents`, { method: "POST", body }),
     onSuccess: async () => {
       await cache.invalidateQueries({ queryKey: ["agents", projectId] });
       setError("");
@@ -107,7 +88,7 @@ function Dashboard() {
             Workspace <ChevronRight size={13} /> Overview
           </span>
           <span className="dev">
-            <i /> Local development
+            <i /> {demoMode ? "Read-only snapshot" : "Local development"}
           </span>
         </header>
         <section className="content">
@@ -119,9 +100,13 @@ function Dashboard() {
                 Connect your agents. Build an evidence-backed security practice.
               </p>
             </div>
-            <button onClick={() => setCreating(true)}>
-              <Plus size={16} /> New project
-            </button>
+            {demoMode ? (
+              <p className="form-hint demo-inline-note">{readOnlyNote}</p>
+            ) : (
+              <button onClick={() => setCreating(true)}>
+                <Plus size={16} /> New project
+              </button>
+            )}
           </div>
           <div className="metrics">
             <article>
@@ -192,12 +177,16 @@ function Dashboard() {
                     Create a project to organize agents and their permission
                     policies.
                   </p>
-                  <button
-                    className="secondary"
-                    onClick={() => setCreating(true)}
-                  >
-                    Create project <ArrowUpRight size={14} />
-                  </button>
+                  {demoMode ? (
+                    <p className="form-hint">{readOnlyNote}</p>
+                  ) : (
+                    <button
+                      className="secondary"
+                      onClick={() => setCreating(true)}
+                    >
+                      Create project <ArrowUpRight size={14} />
+                    </button>
+                  )}
                 </div>
               )}
             </section>
@@ -238,65 +227,74 @@ function Dashboard() {
                       </p>
                     )}
                   </div>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const data = new FormData(e.currentTarget);
-                      const name = String(data.get("name")).trim();
-                      if (!name) {
-                        setError("Enter an agent name");
-                        return;
-                      }
-                      createAgent.mutate({
-                        name,
-                        variant: String(data.get("variant")),
-                        adapter: String(data.get("adapter")),
-                        server_variant: String(data.get("server_variant")),
-                      });
-                    }}
-                  >
-                    <label htmlFor="agent-name">
-                      Register an example agent
-                    </label>
-                    <div className="form-row">
-                      <input
-                        id="agent-name"
-                        name="name"
-                        placeholder="e.g. Payments assistant"
-                        required
-                        maxLength={120}
-                      />
-                      <select name="variant" aria-label="Agent variant">
-                        <option value="hardened">Hardened</option>
-                        <option value="vulnerable">Vulnerable</option>
-                      </select>
-                    </div>
-                    <div className="form-row integration-row">
-                      <select name="adapter" aria-label="Integration adapter">
-                        <option value="local">Local fixture</option>
-                        <option value="mcp">MCP stdio fixture</option>
-                      </select>
-                      <select
-                        name="server_variant"
-                        aria-label="MCP server policy enforcement"
-                      >
-                        <option value="vulnerable">Unguarded MCP server</option>
-                        <option value="hardened">
-                          Policy-enforcing MCP server
-                        </option>
-                      </select>
-                    </div>
-                    <p className="form-hint">
-                      Synthetic fixtures only. No production credentials
-                      required.
+                  {demoMode ? (
+                    <p className="form-hint demo-note">
+                      Agent registration is disabled. These two fixtures were
+                      already scored.
                     </p>
-                    <button disabled={createAgent.isPending}>
-                      {createAgent.isPending
-                        ? "Registering…"
-                        : "Register agent"}
-                      <Plus size={14} />
-                    </button>
-                  </form>
+                  ) : (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const data = new FormData(e.currentTarget);
+                        const name = String(data.get("name")).trim();
+                        if (!name) {
+                          setError("Enter an agent name");
+                          return;
+                        }
+                        createAgent.mutate({
+                          name,
+                          variant: String(data.get("variant")),
+                          adapter: String(data.get("adapter")),
+                          server_variant: String(data.get("server_variant")),
+                        });
+                      }}
+                    >
+                      <label htmlFor="agent-name">
+                        Register an example agent
+                      </label>
+                      <div className="form-row">
+                        <input
+                          id="agent-name"
+                          name="name"
+                          placeholder="e.g. Payments assistant"
+                          required
+                          maxLength={120}
+                        />
+                        <select name="variant" aria-label="Agent variant">
+                          <option value="hardened">Hardened</option>
+                          <option value="vulnerable">Vulnerable</option>
+                        </select>
+                      </div>
+                      <div className="form-row integration-row">
+                        <select name="adapter" aria-label="Integration adapter">
+                          <option value="local">Local fixture</option>
+                          <option value="mcp">MCP stdio fixture</option>
+                        </select>
+                        <select
+                          name="server_variant"
+                          aria-label="MCP server policy enforcement"
+                        >
+                          <option value="vulnerable">
+                            Unguarded MCP server
+                          </option>
+                          <option value="hardened">
+                            Policy-enforcing MCP server
+                          </option>
+                        </select>
+                      </div>
+                      <p className="form-hint">
+                        Synthetic fixtures only. No production credentials
+                        required.
+                      </p>
+                      <button disabled={createAgent.isPending}>
+                        {createAgent.isPending
+                          ? "Registering…"
+                          : "Register agent"}
+                        <Plus size={14} />
+                      </button>
+                    </form>
+                  )}
                 </>
               )}
             </section>
@@ -322,7 +320,7 @@ function Dashboard() {
               </p>
             </div>
           </div>
-          {creating && (
+          {creating && !demoMode && (
             <section className="panel create-panel" aria-label="Create project">
               <div className="panel-heading">
                 <h2>New project</h2>
@@ -377,7 +375,11 @@ function Dashboard() {
           )}
           <footer>
             <span>Security for Autonomous Intelligence.</span>
-            <span>Local workspace · Development access enabled</span>
+            <span>
+              {demoMode
+                ? "Public snapshot · Create and run controls disabled"
+                : "Local workspace · Development access enabled"}
+            </span>
           </footer>
         </section>
       </main>

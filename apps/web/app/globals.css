@@ -160,6 +160,91 @@ header > span {
   border-radius: 20px;
   padding: 7px 11px;
 }
+.demo-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px 20px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 22px;
+  background: #141226;
+  border-bottom: 1px solid #3c3460;
+  color: #ddd6fe;
+  font-size: 13px;
+}
+.demo-banner p {
+  margin: 0;
+  color: #ddd6fe;
+}
+.demo-banner a {
+  color: #c4b5fd;
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.demo-inline-note {
+  max-width: 280px;
+  margin: 0;
+  text-align: right;
+}
+.demo-note {
+  margin-top: 10px;
+}
+.demo-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 8px;
+}
+.demo-score {
+  border: 1px solid #302e47;
+  background: linear-gradient(130deg, #161627, #101722);
+  border-radius: 9px;
+  padding: 18px 20px;
+}
+.demo-score span {
+  color: #ab9def;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.demo-score strong {
+  display: block;
+  font-size: 42px;
+  font-weight: 500;
+  letter-spacing: -1px;
+  margin: 8px 0 4px;
+}
+.demo-score strong small {
+  font-size: 16px;
+  color: #8b93a7;
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+.demo-score p {
+  color: #e6e9f2;
+  margin: 0;
+}
+.demo-score > small {
+  display: block;
+  margin-top: 8px;
+  color: #8b97ab;
+  font-size: 12px;
+}
+.score-caption {
+  color: #e6e9f2;
+  margin: 8px 0 0;
+}
+.triage-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+button.readonly:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 i {
   width: 6px;
   height: 6px;
@@ -489,6 +574,7 @@ footer {
   }
   nav {
     display: flex;
+    flex-wrap: wrap;
     margin-top: 20px;
   }
   nav a {
@@ -504,6 +590,16 @@ footer {
   }
   .heading {
     display: block;
+  }
+  .demo-inline-note {
+    text-align: left;
+    margin-top: 16px;
+  }
+  .demo-compare {
+    grid-template-columns: 1fr;
+  }
+  .demo-banner {
+    align-items: flex-start;
   }
   .heading button {
     margin-top: 20px;
@@ -725,6 +821,7 @@ summary {
 }
 .table-scroll {
   overflow-x: auto;
+  max-width: 100%;
 }
 .findings-table {
   width: 100%;

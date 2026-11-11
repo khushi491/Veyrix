@@ -40,8 +40,13 @@ cd apps/web
 npm ci
 npm run build
 npm run typecheck
+NEXT_PUBLIC_VEYRIX_DEMO=true npm run build
 npm audit
 ```
+
+`make demo-snapshot` regenerates `apps/web/demo/snapshot.json` from the local engine.
+`tests/test_demo_snapshot.py` checks that file against a fresh run, `calculate_score`,
+and `verified_result`. The demo build omits the `/api` rewrite to FastAPI.
 
 Build/type checks are not browser interaction tests. Automated browser end-to-end and
 visual tests remain incomplete. The local setup was checked through HTTP and the API;

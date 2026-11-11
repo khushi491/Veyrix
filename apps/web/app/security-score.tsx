@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { api } from "./api-client";
+import { demoMode } from "./demo-mode";
 import {
   CartesianGrid,
   Line,
@@ -73,18 +75,12 @@ type Entry = {
   snapshot_persisted: boolean;
   assessment: SecurityAssessment;
 };
-type Agent = { id: string; name: string };
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`/api${path}`);
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(
-      typeof body?.detail === "string"
-        ? body.detail
-        : `Assessment request failed (${response.status}). Check the API and migrations.`,
-    );
-  }
-  return response.json() as Promise<T>;
+type Agent = { id: string; name: string; variant?: string };
+function request<T>(path: string): Promise<T> {
+  return api<T>(path, {
+    fallback:
+      "Assessment request failed ({status}). Check the API and migrations.",
+  });
 }
 const words = (value: string) => value.toLowerCase().replaceAll("_", " ");
 const points = (value: number) => value.toFixed(2).replace(/\.00$/, "");
@@ -92,9 +88,11 @@ const points = (value: number) => value.toFixed(2).replace(/\.00$/, "");
 export function ScoreCard({
   entry,
   linkToResults = false,
+  caption,
 }: {
   entry: Entry;
   linkToResults?: boolean;
+  caption?: string;
 }) {
   const score = entry.assessment;
   return (
@@ -102,6 +100,7 @@ export function ScoreCard({
       <div className="score-card-heading">
         <div>
           <span className="eyebrow">SCOPED SECURITY ASSESSMENT</span>
+          {caption ? <p className="score-caption">{caption}</p> : null}
           <h3>Veyrix Security Score</h3>
         </div>
         <span className="method-badge">Method {score.methodology_version}</span>
@@ -327,9 +326,10 @@ export function RunScore({ runId, status }: { runId: string; status: string }) {
   const score = useQuery({
     queryKey: ["run-score", runId, status],
     queryFn: () => request<Entry>(`/runs/${runId}/score`),
-    refetchInterval: ["queued", "running", "cancelling"].includes(status)
-      ? 1000
-      : false,
+    refetchInterval:
+      !demoMode && ["queued", "running", "cancelling"].includes(status)
+        ? 1000
+        : false,
   });
   if (score.isPending)
     return <p className="score-loading">Loading assessment score…</p>;
@@ -343,6 +343,58 @@ export function RunScore({ runId, status }: { runId: string; status: string }) {
       </p>
     );
   return score.data ? <ScoreCard entry={score.data} linkToResults /> : null;
+}
+
+function DemoComparison({
+  projectId,
+  agents,
+}: {
+  projectId: string;
+  agents: Agent[];
+}) {
+  if (!agents.length) return null;
+  return (
+    <div className="demo-compare" id="demo-comparison">
+      {agents.map((agent) => (
+        <DemoAgentScore key={agent.id} projectId={projectId} agent={agent} />
+      ))}
+    </div>
+  );
+}
+
+function DemoAgentScore({
+  projectId,
+  agent,
+}: {
+  projectId: string;
+  agent: Agent;
+}) {
+  const group = useQuery({
+    queryKey: ["agent-scores", projectId, agent.id],
+    queryFn: () =>
+      request<{ latest: Entry | null }>(
+        `/projects/${projectId}/scores?agent_id=${agent.id}`,
+      ),
+    enabled: !!projectId,
+  });
+  const assessment = group.data?.latest?.assessment;
+  return (
+    <article className="demo-score">
+      <span>{agent.variant ? `${agent.variant} fixture` : "Fixture"}</span>
+      <strong>
+        {assessment?.score ?? "—"}
+        {assessment?.score !== undefined && assessment.score !== null ? (
+          <small>/100</small>
+        ) : null}
+      </strong>
+      <p>{agent.name}</p>
+      <small>
+        {assessment
+          ? `${assessment.counts.FAIL} verified findings · ${assessment.counts.PASS} passed`
+          : "Loading saved assessment…"}
+      </small>
+    </article>
+  );
 }
 
 export function ScoreOverview({
@@ -363,7 +415,7 @@ export function ScoreOverview({
         `/projects/${projectId}/scores?agent_id=${agentId}`,
       ),
     enabled: !!projectId && !!agentId,
-    refetchInterval: 5000,
+    refetchInterval: demoMode ? false : 5000,
   });
   const latest = group.data?.latest;
   const history = group.data?.history || [];
@@ -379,6 +431,9 @@ export function ScoreOverview({
         <span>VERSIONED · EVIDENCE-BACKED</span>
       </div>
       <div className="score-overview-content">
+        {demoMode && (
+          <DemoComparison projectId={projectId} agents={agents} />
+        )}
         <label htmlFor="score-agent">Agent assessment scope</label>
         <select
           id="score-agent"
@@ -408,7 +463,14 @@ export function ScoreOverview({
           <p className="score-loading">Loading saved assessments…</p>
         ) : latest ? (
           <>
-            <ScoreCard entry={latest} />
+            <ScoreCard
+              entry={latest}
+              caption={
+                demoMode
+                  ? agents.find((agent) => agent.id === agentId)?.name
+                  : undefined
+              }
+            />
             <div className="score-trend">
               <h3>Comparable assessment history</h3>
               <p>
@@ -478,6 +540,7 @@ export function ScoreOverview({
               )}
               <details className="score-history">
                 <summary>View recorded assessment history</summary>
+                <div className="table-scroll">
                 <table className="score-case-table">
                   <thead>
                     <tr>
@@ -503,6 +566,7 @@ export function ScoreOverview({
                     ))}
                   </tbody>
                 </table>
+                </div>
               </details>
             </div>
             <a className="export-link" href={`/findings?project=${projectId}`}>
