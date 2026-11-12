@@ -35,7 +35,7 @@ flowchart LR
 
 PostgreSQL is the durable queue. Redis only wakes the worker. The Compose worker is unprivileged, has a read-only filesystem, and sits on an internal network. Tool calls from the local parser, the MCP server, and the `llm` adapter execute in the same in-memory sandbox.
 
-Details: [architecture](ARCHITECTURE.md), [scenarios](docs/SCENARIOS.md), [MCP](docs/MCP.md), [scoring](SCORING.md), [findings](docs/FINDINGS.md).
+Details: [architecture](ARCHITECTURE.md), [scenarios](docs/SCENARIOS.md), [what the kit catches](docs/red-team-kit.md), [MCP](docs/MCP.md), [scoring](SCORING.md), [findings](docs/FINDINGS.md).
 
 ## Demo results
 
@@ -56,7 +56,7 @@ These scores describe the deterministic local fixtures under methodology 1.0.0. 
 
 <img src="docs/images/evidence-trace.png" alt="Evidence trace for an untrusted document that requested transfer_funds. The tool request is marked as policy-violation evidence and the policy decision is FAIL." width="880">
 
-The route `/kit` is the always-on readout of the GitHub Action: the same two fixtures, with the scan time, engine and scoring versions, verified findings, and one full evidence trace. It reads a scheduled JSON publication and falls back to `apps/web/demo/kit-scan.json` until that publication exists. Hosting, the publication branch, and snapshot regeneration: [docs/DEMO.md](docs/DEMO.md).
+The route `/kit` is the always-on readout of the GitHub Action: the same two fixtures, with the scan time, engine and scoring versions, verified findings, and one full evidence trace. It reads a scheduled JSON publication and falls back to `apps/web/demo/kit-scan.json` until that publication exists. What those scenarios test, and the detection rates measured on the fixtures, is in [docs/red-team-kit.md](docs/red-team-kit.md). Hosting, the publication branch, and snapshot regeneration: [docs/DEMO.md](docs/DEMO.md).
 
 ## Quickstart
 
