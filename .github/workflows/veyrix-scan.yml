@@ -130,3 +130,44 @@ jobs:
             echo "Veyrix action did not succeed"
             exit 1
           fi
+
+  # Writes kit-scans/latest.json for the public dashboard. Pull requests do not
+  # publish. The push refspec is refs/heads/kit-scans, never main. No new secret:
+  # the job uses the built-in GITHUB_TOKEN. continue-on-error keeps a token or
+  # branch-permission failure from hiding the fixture results above.
+  publish-kit-scan:
+    name: Publish kit scan
+    needs: [vulnerable, hardened]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Veyrix
+        run: python -m pip install --disable-pip-version-check .
+
+      - name: Download the fixture reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: veyrix-local-*
+          path: kit-artifacts
+          merge-multiple: false
+
+      - name: Assemble latest.json
+        run: python -m veyrix.kit_snapshot publish --artifacts kit-artifacts --output latest.json
+
+      - name: Publish latest.json to kit-scans
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash .github/veyrix-action/publish_kit_branch.sh latest.json

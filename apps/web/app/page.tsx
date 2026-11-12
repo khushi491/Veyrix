@@ -309,6 +309,22 @@ function Dashboard() {
             agents={agents.data ?? []}
             projectId={projectId}
           />
+          <section className="panel kit-teaser" id="red-team-kit">
+            <div className="panel-heading">
+              <h2>Always-on red-team kit</h2>
+              <span>SCHEDULED SCAN</span>
+            </div>
+            <div className="kit-body">
+              <p>
+                GitHub Actions scans a deliberately vulnerable sample agent and
+                the hardened fixture. The kit page shows the score, the verified
+                findings, a full evidence trace, and when that scan last ran.
+              </p>
+              <a className="button-link" href="/kit">
+                Open the kit readout
+              </a>
+            </div>
+          </section>
           <div className="notice">
             <CircleDot size={18} />
             <div>

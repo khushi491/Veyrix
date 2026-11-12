@@ -4,6 +4,7 @@ import {
   CircleDot,
   Folder,
   FlaskConical,
+  Radar,
   Shield,
   Terminal,
 } from "lucide-react";
@@ -13,7 +14,7 @@ export function Sidebar({
   active = "overview",
   projectId,
 }: {
-  active?: "overview" | "findings";
+  active?: "overview" | "findings" | "kit";
   projectId?: string;
 }) {
   return (
@@ -28,6 +29,10 @@ export function Sidebar({
         <a href="/" className={active === "overview" ? "active" : ""}>
           <Box size={17} />
           Overview
+        </a>
+        <a href="/kit" className={active === "kit" ? "active" : ""}>
+          <Radar size={17} />
+          Red-team kit
         </a>
         <a href="/#projects">
           <Folder size={17} />

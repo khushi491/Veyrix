@@ -183,4 +183,17 @@ The action runs the CLI in-process. It does not apply the worker subprocess CPU,
 
 Code scanning stores the SARIF GitHub accepts. The action does not clear alerts from older categories. Uploading the hardened fixture in the same category as the vulnerable fixture would replace those results, which is why the self-test uploads only the vulnerable SARIF.
 
+## Public kit page
+
+The dashboard route `/kit` renders these scans. The publish job in
+[`.github/workflows/veyrix-scan.yml`](../.github/workflows/veyrix-scan.yml) writes
+`latest.json` to the `kit-scans` branch after a scheduled or manual run on `main`.
+It does not commit to `main`, it does not run on pull requests, and it does not
+need a new secret or a deploy hook. The page falls back to
+[`apps/web/demo/kit-scan.json`](../apps/web/demo/kit-scan.json) until that file is
+available. Details are in [DEMO.md](DEMO.md).
+
+The vulnerable upload is the deliberately vulnerable document assistant. Those
+alerts are sample output, not a review of the Veyrix product source as an agent.
+
 The CLI reference is [docs/cli.md](cli.md).
