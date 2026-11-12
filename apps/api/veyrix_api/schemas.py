@@ -42,7 +42,7 @@ class SecurityPolicy(BaseModel):
 
 
 class AgentCreate(ProjectCreate):
-    adapter: Literal["local", "mcp"] = "local"
+    adapter: Literal["local", "mcp", "llm"] = "local"
     server_variant: Literal["vulnerable", "hardened"] = "vulnerable"
     variant: Literal["vulnerable", "hardened"] = "hardened"
     policy: SecurityPolicy = Field(default_factory=SecurityPolicy)

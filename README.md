@@ -146,6 +146,45 @@ content, actual tool requests/responses, and policy decisions.
 Only bundled stdio servers are accepted. There is no arbitrary command, filesystem
 server, production secret or external endpoint configuration. See [MCP testing](docs/MCP.md).
 
+## Tool-calling model adapter
+
+Register `adapter=llm` through the API to run the same twelve local scenarios through an
+OpenAI-compatible Chat Completions endpoint (`tools` / `tool_calls`). The dashboard form
+still offers only the local and MCP fixtures. The model may call only the synthetic mock
+tools. Those calls are executed in the existing in-memory sandbox, recorded in the same
+ordered trace, and scored by `verified_result` and `calculate_score`. The agent's
+`variant` does not change a live model. It selects the offline scripted transport and is
+stored on the run.
+
+Set the endpoint in the environment of both the API and the worker. Do not put the key in
+a request body or in the database. Leave the key empty for a local server that does not
+require one. Cleartext HTTP is accepted only for a loopback address.
+
+Free local model (Ollama or another OpenAI-compatible server):
+
+```sh
+export VEYRIX_LLM_BASE_URL=http://127.0.0.1:11434/v1
+export VEYRIX_LLM_MODEL=qwen2.5:3b
+# VEYRIX_LLM_API_KEY stays unset
+```
+
+Hosted provider:
+
+```sh
+export VEYRIX_LLM_BASE_URL=https://api.openai.com/v1
+export VEYRIX_LLM_MODEL=gpt-4o-mini
+export VEYRIX_LLM_API_KEY=  # set this in your shell; do not commit a value
+```
+
+Start the API and `python -m veyrix_api.worker` on the host. The Compose worker stays on
+an internal network and cannot reach Ollama or a hosted API. Each scenario allows at most
+8 model steps (default 6) and a wall-clock budget under the 60-second worker lease
+(default 45 seconds). A cutoff after a prohibited tool call stays FAIL. A cutoff with no
+prohibited call is ERROR or INCONCLUSIVE, not PASS.
+
+CI and `pytest` use `VEYRIX_LLM_TRANSPORT=scripted` with `VEYRIX_LLM_ALLOW_SCRIPTED=1`.
+That transport does not call a model. See [scenario notes](docs/SCENARIOS.md).
+
 
 ## Findings explorer
 

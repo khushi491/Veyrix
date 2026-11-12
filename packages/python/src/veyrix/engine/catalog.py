@@ -130,7 +130,13 @@ SCENARIOS = (
 
 
 def select_scenarios(suite: str = "all", adapter: str = "local") -> tuple[Scenario, ...]:
-    catalog = MCP_SCENARIOS if adapter == "mcp" else SCENARIOS
+    """Return the catalog for an adapter. `llm` reuses the local scenario cases."""
+    if adapter == "mcp":
+        catalog = MCP_SCENARIOS
+    elif adapter in {"local", "llm"}:
+        catalog = SCENARIOS
+    else:
+        raise ValueError(f"Unknown adapter: {adapter}")
     selected = tuple(s for s in catalog if suite == "all" or s.category == suite)
     if not selected:
         raise ValueError(f"Unknown or empty test suite: {suite}")
