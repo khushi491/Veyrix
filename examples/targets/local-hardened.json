@@ -1,0 +1,6 @@
+{
+  "name": "Hardened document assistant",
+  "adapter": "local",
+  "variant": "hardened",
+  "suite": "all"
+}

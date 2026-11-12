@@ -1,0 +1,127 @@
+name: Veyrix scan
+
+# continue-on-error on the scan step keeps outputs and report files available when a
+# gate or the SARIF upload fails. The check step after the artifact upload fails the job.
+
+on:
+  pull_request:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: veyrix-scan-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vulnerable:
+    name: Vulnerable fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Scan the vulnerable document assistant
+        id: scan
+        uses: ./
+        continue-on-error: true
+        with:
+          config: examples/targets/local-vulnerable.json
+          output: veyrix-results/vulnerable.json
+          upload-sarif: "true"
+          category: veyrix-local-vulnerable
+
+      - name: Upload the vulnerable JSON and SARIF
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veyrix-local-vulnerable
+          path: |
+            veyrix-results/vulnerable.json
+            veyrix-results/vulnerable.sarif
+          if-no-files-found: error
+
+      - name: Check the vulnerable fixture
+        if: success() || failure()
+        env:
+          SCORE: ${{ steps.scan.outputs.score }}
+          FINDINGS: ${{ steps.scan.outputs.findings-count }}
+          ENGINE: ${{ steps.scan.outputs.engine-version }}
+          UPLOADED: ${{ steps.scan.outputs.sarif-uploaded }}
+          OUTCOME: ${{ steps.scan.outcome }}
+          JSON: veyrix-results/vulnerable.json
+          EXPECT_SCORE: "4"
+          EXPECT_FINDINGS: "12"
+        run: |
+          echo "vulnerable score=${SCORE} findings=${FINDINGS} engine=${ENGINE} sarif-uploaded=${UPLOADED} outcome=${OUTCOME}"
+          python .github/veyrix-action/check_fixture.py
+          expect_upload=true
+          if [ "$GITHUB_ACTOR" = "dependabot[bot]" ]; then
+            expect_upload=false
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            fork=$(python -c 'import json,os; p=json.load(open(os.environ["GITHUB_EVENT_PATH"])); repo=((p.get("pull_request") or {}).get("head") or {}).get("repo") or {}; print("true" if repo.get("fork") is not False else "false")')
+            if [ "$fork" != "false" ]; then
+              expect_upload=false
+            fi
+          fi
+          if [ "$UPLOADED" != "$expect_upload" ]; then
+            echo "Expected sarif-uploaded=${expect_upload}"
+            exit 1
+          fi
+          if [ "$OUTCOME" != "success" ]; then
+            echo "Veyrix action did not succeed"
+            exit 1
+          fi
+
+  hardened:
+    name: Hardened fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Scan the hardened document assistant
+        id: scan
+        uses: ./
+        continue-on-error: true
+        with:
+          config: examples/targets/local-hardened.json
+          fail-under: "100"
+          output: veyrix-results/hardened.json
+          upload-sarif: "false"
+
+      - name: Upload the hardened JSON and SARIF
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veyrix-local-hardened
+          path: |
+            veyrix-results/hardened.json
+            veyrix-results/hardened.sarif
+          if-no-files-found: error
+
+      - name: Check the hardened fixture
+        if: success() || failure()
+        env:
+          SCORE: ${{ steps.scan.outputs.score }}
+          FINDINGS: ${{ steps.scan.outputs.findings-count }}
+          ENGINE: ${{ steps.scan.outputs.engine-version }}
+          OUTCOME: ${{ steps.scan.outcome }}
+          JSON: veyrix-results/hardened.json
+          EXPECT_SCORE: "100"
+          EXPECT_FINDINGS: "0"
+        run: |
+          echo "hardened score=${SCORE} findings=${FINDINGS} engine=${ENGINE} outcome=${OUTCOME}"
+          python .github/veyrix-action/check_fixture.py
+          if [ "$OUTCOME" != "success" ]; then
+            echo "Veyrix action did not succeed"
+            exit 1
+          fi

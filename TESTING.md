@@ -13,6 +13,10 @@ they use no external network services, production credentials, or external model
 LLM adapter tests use a scripted chat transport and an in-process HTTP replay. They do
 not read `VEYRIX_LLM_API_KEY` and they do not call Ollama or a hosted model.
 
+## GitHub Action
+
+[`.github/workflows/veyrix-scan.yml`](.github/workflows/veyrix-scan.yml) calls the local composite action on pull requests, a daily schedule (`17 6 * * *` UTC), and `workflow_dispatch`. It scans `examples/targets/local-vulnerable.json` without a failing gate and `examples/targets/local-hardened.json` with `fail-under: 100`. JSON and SARIF are uploaded as artifacts. The vulnerable SARIF is sent to code scanning when the token can write `security-events`. The workflow does not call a model and does not need Postgres. Details: [docs/github-action.md](docs/github-action.md).
+
 ## PostgreSQL integration
 
 Use a dedicated disposable database, never production data:

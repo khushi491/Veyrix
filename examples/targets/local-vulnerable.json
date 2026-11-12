@@ -1,0 +1,6 @@
+{
+  "name": "Vulnerable document assistant",
+  "adapter": "local",
+  "variant": "vulnerable",
+  "suite": "all"
+}
