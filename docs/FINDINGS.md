@@ -53,8 +53,10 @@ an approximate observation timestamp; inspect the trace for timestamp availabili
 
 ## Limits
 
-Current agent adapters are deterministic fixtures, including when using real MCP stdio
-transport. Findings demonstrate synthetic boundary failures, not production-model
-vulnerabilities. Tool-response execution claims are reliable for the bundled mock
-servers; generalized external server attestation is not implemented. Root-cause text is
-explicitly a hypothesis. No hidden model reasoning is collected or displayed.
+The local adapter and the MCP stdio adapter are deterministic fixtures. The `llm`
+adapter can call a configured model, and those tool calls still execute only in the
+synthetic sandbox. Findings demonstrate observed boundary failures in that sandbox.
+They do not certify a production model. Tool-response execution claims are reliable
+for the bundled mock servers; generalized external server attestation is not
+implemented. Root-cause text is explicitly a hypothesis. No hidden model reasoning
+is collected or displayed.
