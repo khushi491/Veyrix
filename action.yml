@@ -1,0 +1,134 @@
+name: Veyrix scan
+description: Run veyrix scan and optionally upload SARIF to GitHub code scanning.
+author: khushi491
+
+# This file is not a GitHub Marketplace listing. Callers use khushi491/Veyrix@<ref>.
+# upload-sarif needs a job permission of security-events: write. contents: read is
+# enough to check out the caller repo. Private code scanning also needs actions: read.
+# Fork pull requests and Dependabot cannot write security events; the upload is skipped.
+
+inputs:
+  config:
+    description: Path to a JSON or TOML target file, relative to the workspace. Flags override the file.
+    required: false
+    default: ""
+  adapter:
+    description: "local, mcp, or llm. Required with variant when config is omitted."
+    required: false
+    default: ""
+  variant:
+    description: "vulnerable or hardened. Required with adapter when config is omitted."
+    required: false
+    default: ""
+  server-variant:
+    description: Bundled MCP server variant. The CLI default is vulnerable.
+    required: false
+    default: ""
+  suite:
+    description: Scenario suite. The CLI default is all.
+    required: false
+    default: ""
+  name:
+    description: Display name stored on the report. The CLI default names the fixture.
+    required: false
+    default: ""
+  fail-under:
+    description: Exit 1 when the numeric score is missing or below this integer (0-100). Empty skips the score gate.
+    required: false
+    default: ""
+  fail-on:
+    description: Exit 1 when a verified finding is at this severity or higher (info, low, medium, high, critical).
+    required: false
+    default: ""
+  output:
+    description: JSON report path. The SARIF file is the same path with a .sarif suffix.
+    required: false
+    default: veyrix-results.json
+  upload-sarif:
+    description: Upload the SARIF file to GitHub code scanning. true or false. Fork pull requests are skipped.
+    required: false
+    default: "false"
+  category:
+    description: Code scanning category. Use a distinct value when one workflow uploads more than one SARIF file.
+    required: false
+    default: veyrix
+  python-version:
+    description: Python version used to install and run Veyrix. The package requires 3.12 or newer.
+    required: false
+    default: "3.12"
+
+outputs:
+  score:
+    description: Numeric score from 0 to 100, or empty when the run has no numeric score.
+    value: ${{ steps.scan.outputs.score }}
+  findings-count:
+    description: Verified finding count. Empty when the scan does not finish.
+    value: ${{ steps.scan.outputs.findings-count }}
+  sarif-path:
+    description: Workspace-relative SARIF path when the file was written.
+    value: ${{ steps.scan.outputs.sarif-path }}
+  json-path:
+    description: Workspace-relative JSON report path when the file was written.
+    value: ${{ steps.scan.outputs.json-path }}
+  engine-version:
+    description: Veyrix engine version recorded on the report.
+    value: ${{ steps.scan.outputs.engine-version }}
+  sarif-uploaded:
+    description: "true when this run uploaded SARIF to code scanning and GitHub accepted the processing wait."
+    value: ${{ steps.upload-result.outputs.sarif-uploaded }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Veyrix
+      id: install
+      shell: bash
+      run: |
+        work=$(mktemp -d)
+        mkdir -p "$work/apps" "$work/packages"
+        cp "$GITHUB_ACTION_PATH/pyproject.toml" "$work/pyproject.toml"
+        cp -a "$GITHUB_ACTION_PATH/apps/api" "$work/apps/api"
+        cp -a "$GITHUB_ACTION_PATH/packages/python" "$work/packages/python"
+        python -m pip install --disable-pip-version-check "$work"
+        rm -rf "$work"
+
+    - name: Run veyrix scan
+      id: scan
+      shell: bash
+      env:
+        VEYRIX_CONFIG: ${{ inputs.config }}
+        VEYRIX_ADAPTER: ${{ inputs.adapter }}
+        VEYRIX_VARIANT: ${{ inputs.variant }}
+        VEYRIX_SERVER_VARIANT: ${{ inputs.server-variant }}
+        VEYRIX_SUITE: ${{ inputs.suite }}
+        VEYRIX_NAME: ${{ inputs.name }}
+        VEYRIX_FAIL_UNDER: ${{ inputs.fail-under }}
+        VEYRIX_FAIL_ON: ${{ inputs.fail-on }}
+        VEYRIX_OUTPUT: ${{ inputs.output }}
+        VEYRIX_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+      run: python "$GITHUB_ACTION_PATH/.github/veyrix-action/run_scan.py"
+
+    - name: Upload SARIF to code scanning
+      id: upload
+      if: ${{ (success() || failure()) && steps.scan.outputs.upload == 'true' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-path }}
+        category: ${{ inputs.category }}
+        checkout_path: ${{ github.workspace }}
+        wait-for-processing: "true"
+
+    - name: Record the SARIF upload result
+      id: upload-result
+      if: ${{ (success() || failure()) && steps.install.outcome == 'success' }}
+      shell: bash
+      env:
+        UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+        UPLOAD_PLANNED: ${{ steps.scan.outputs.upload }}
+        SARIF_ID: ${{ steps.upload.outputs.sarif-id }}
+      run: python "$GITHUB_ACTION_PATH/.github/veyrix-action/run_scan.py" record-upload

@@ -5,6 +5,7 @@ Break your agents before attackers do: versioned scenarios, ordered evidence tra
 **[Live read-only demo](https://veyrix-khushi491s-projects.vercel.app)** — a read-only snapshot of the engine, with no live scans, database, or worker.
 
 [![CI](https://github.com/khushi491/Veyrix/actions/workflows/checks.yml/badge.svg)](https://github.com/khushi491/Veyrix/actions/workflows/checks.yml)
+[![Veyrix scan](https://github.com/khushi491/Veyrix/actions/workflows/veyrix-scan.yml/badge.svg)](https://github.com/khushi491/Veyrix/actions/workflows/veyrix-scan.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## The problem
@@ -121,9 +122,30 @@ veyrix scan --config target.json --format sarif --output results.sarif --fail-un
 
 Exit 0 when the scan finishes and every requested gate passes. Exit 1 when the score is below `--fail-under` or a verified finding is at `--fail-on` or higher. Text, JSON, and SARIF 2.1.0 output are documented in [docs/cli.md](docs/cli.md).
 
+## GitHub Action
+
+The root [`action.yml`](action.yml) is a composite action. It installs this repository at the ref you pin, runs `veyrix scan`, writes a job summary, and can upload SARIF 2.1.0 to GitHub code scanning. It is not published on the GitHub Marketplace. There is no release tag yet, so pin a commit SHA or use `@main` after this file is on the default branch.
+
+```yaml
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+  - uses: khushi491/Veyrix@main
+    with:
+      config: veyrix.json
+      fail-under: "80"
+      upload-sarif: "true"
+```
+
+`security-events: write` is required for the upload. Fork pull requests and Dependabot runs skip it. Inputs, the daily self-test, and an optional local Ollama scan are in [docs/github-action.md](docs/github-action.md).
+
 ## Tests and CI
 
-[Foundation checks](.github/workflows/checks.yml) run on every push and pull request.
+[Foundation checks](.github/workflows/checks.yml) run on every push and pull request. [Veyrix scan](.github/workflows/veyrix-scan.yml) runs the local fixtures on pull requests, a daily schedule, and `workflow_dispatch`. The vulnerable fixture is expected to score 4 with 12 findings and does not fail the job. The hardened fixture uses `fail-under: 100`.
 
 - **API:** Python 3.12, PostgreSQL 17, `alembic upgrade head`, `ruff check .`, and `pytest`.
 - **Web:** Node 22, `npm ci`, typecheck, the production build, and a demo build that fails if `/api` still proxies to `127.0.0.1:8000`.
@@ -143,7 +165,6 @@ Full notes: [TESTING.md](TESTING.md). Current scope: [docs/STATUS.md](docs/STATU
 
 Next:
 
-- A GitHub Action other repositories can run
 - Hosted authentication and project membership
 - Browser end-to-end tests
 

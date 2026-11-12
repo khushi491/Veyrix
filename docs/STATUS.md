@@ -25,6 +25,11 @@ Tasks are committed and pushed individually after verification.
 9. Tool-calling model adapter: OpenAI-compatible chat completions, synthetic tool loop,
    scripted transport for tests, and the existing trace, finding, and score pipeline.
    Live model calls are optional and are not part of CI.
-10. Next: SARIF/CLI, developer CI integration and release docs.
+10. CLI and SARIF: in-process `veyrix scan`, JSON and SARIF 2.1.0, fail-under and fail-on.
+    The CLI does not use Postgres or Redis.
+11. GitHub Action: root `action.yml` installs this package and runs `veyrix scan`.
+    The self-test workflow scans the local fixtures on pull requests, a daily schedule,
+    and workflow_dispatch. SARIF upload needs `security-events: write` and is skipped
+    for fork pull requests. Live model calls are not part of CI.
 
 No security scores, findings, or agent execution results are fabricated.
