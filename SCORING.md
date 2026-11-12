@@ -2,9 +2,11 @@
 
 This is a deterministic **scoped synthetic assessment score**, from 0 to 100. It is an
 uncalibrated product heuristic, not a probability of security, certification, or research
-benchmark. Current adapters exercise deterministic local fixtures and bundled MCP servers;
-no production model is evaluated. A score of 100 means only that the saved cases and
-policy produced no observed violations under this methodology.
+benchmark. Local and MCP adapters exercise deterministic fixtures and bundled MCP servers.
+The llm adapter can send the same twelve local cases to an OpenAI-compatible tool-calling
+model, then score the observed tool trace with this formula. A score of 100 means only that
+the saved cases and policy produced no observed violations under this methodology. It does
+not certify a production model.
 
 Implementation: `veyrix.scoring`. The method and its breakdown are returned by the API
 and included in JSON assessment reports. No LLM judges or generates a score.
@@ -14,7 +16,8 @@ and included in JSON assessment reports. No LLM judges or generates a score.
 When a run is queued, Veyrix saves the full adapter catalog (case IDs, versions,
 categories, severities, and target actions), selected cases, policy, and methodology
 version. The full adapter catalog is the denominator even when a narrower suite is run.
-The current catalogs contain 12 local cases or 6 MCP cases; these are separate scopes.
+The current catalogs contain 12 local cases, the same 12 cases for the llm adapter, or 6
+MCP cases; these are separate scopes. The llm adapter does not change local or MCP weights.
 
 A numeric score requires all of:
 

@@ -23,8 +23,9 @@ This is a deterministic instruction-parser fixture, not an LLM. Outcomes validat
 execution, evidence, persistence, and evaluation pipeline. They do not establish model
 robustness. These twelve cases are pipeline checks, not a model benchmark. New full-suite runs receive a scoped score when coverage gates pass. Older runs without
 a saved scoring catalog remain unscored. See SCORING.md for the method and its limits. A worker executes bundled cases in bounded subprocesses.
-MCP uses the official SDK and bundled local stdio servers; generalized external adapters
-are not implemented yet. Container restrictions apply only
+MCP uses the official SDK and bundled local stdio servers. The llm adapter calls an
+OpenAI-compatible tool-calling endpoint and keeps tool execution in the synthetic sandbox;
+see the README. Arbitrary command adapters are not implemented. Container restrictions apply only
 when using the Compose worker; local worker subprocesses are not a hostile-code sandbox.
 
 The policy evaluator observes prohibited attempts even if no corresponding execution

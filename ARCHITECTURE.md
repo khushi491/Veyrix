@@ -5,8 +5,9 @@ configuration in PostgreSQL using SQLAlchemy and versioned Alembic migrations.
 PostgreSQL stores durable queued jobs; Redis provides best-effort wake-up signals.
 A separate worker claims jobs with row locks and executes bundled cases in bounded subprocesses.
 The engine runs a bundled deterministic parser and in-memory mock tools, locally or
-through actual MCP stdio client/server exchanges.
-It cannot load external code, connect to real payment systems, or evaluate external models.
+through actual MCP stdio client/server exchanges. The llm adapter can also call an
+OpenAI-compatible Chat Completions endpoint and execute the returned tool calls in that
+same sandbox. It cannot load external code or connect to real payment systems.
 
 The shared Python distribution will contain engine, adapter, policy, reporting, and CLI
 modules, so CLI and server evaluations use the same implementation. No arbitrary
@@ -28,7 +29,10 @@ Local development mode is explicitly opt-in. Hosted authentication is fail-close
 not implemented. Twelve local and six MCP security scenarios run in the background worker.
 The Compose runner uses synthetic tools, restricted external networking, timeouts and
 resource limits. Neither agent output
-nor MCP responses may be executed as shell commands on the host.
+nor MCP responses may be executed as shell commands on the host. Model tool calls are
+limited to the bundled mock tools. The child process that calls a model receives only
+the LLM endpoint settings, not database credentials. The Compose worker network stays
+internal, so live model calls use the host worker.
 
 ## References consulted
 

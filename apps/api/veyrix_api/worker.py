@@ -14,7 +14,9 @@ from redis import RedisError
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION
+from veyrix.llm.config import LLMRunConfig, load_llm_run_config
 
+from veyrix_api.config import llm_execution_environ
 from veyrix_api.db import engine
 from veyrix_api.findings import persist_finding
 from veyrix_api.jobs import WAKE_KEY, redis_client
@@ -26,14 +28,50 @@ LEASE_SECONDS = 60
 SCENARIO_TIMEOUT = 15
 
 
+def runner_env(adapter: str, llm_config: LLMRunConfig | None = None) -> dict[str, str]:
+    """Minimal child environment. Database credentials are never copied in.
+
+    The llm child receives only its endpoint settings. The API key is included only when
+    one is configured, and only for that adapter.
+    """
+    env = {"PATH": os.defpath, "PYTHONUNBUFFERED": "1"}
+    if adapter != "llm":
+        return env
+    if llm_config is None:
+        llm_config = load_llm_run_config(llm_execution_environ())
+    env.update(
+        {
+            "VEYRIX_LLM_TRANSPORT": llm_config.transport,
+            "VEYRIX_LLM_MODEL": llm_config.model,
+            "VEYRIX_LLM_BASE_URL": llm_config.base_url,
+            "VEYRIX_LLM_TIMEOUT_SECONDS": str(llm_config.timeout_seconds),
+            "VEYRIX_LLM_MAX_STEPS": str(llm_config.max_steps),
+            "VEYRIX_LLM_SCENARIO_TIMEOUT_SECONDS": str(llm_config.scenario_timeout_seconds),
+            "VEYRIX_LLM_DEADLINE_SECONDS": str(llm_config.deadline_seconds),
+        }
+    )
+    if llm_config.transport == "scripted":
+        env["VEYRIX_LLM_ALLOW_SCRIPTED"] = "1"
+    if llm_config.api_key:
+        env["VEYRIX_LLM_API_KEY"] = llm_config.api_key
+    return env
+
+
 def execute_scenario(configuration: dict, scenario_id: str) -> dict:
+    adapter = configuration.get("adapter", "local")
     payload = {
         "variant": configuration["variant"],
         "policy": configuration["policy"],
         "scenario_id": scenario_id,
-        "adapter": configuration.get("adapter", "local"),
+        "adapter": adapter,
         "server_variant": configuration.get("server_variant", "vulnerable"),
+        "model": configuration.get("model"),
     }
+    timeout = SCENARIO_TIMEOUT
+    llm_config = None
+    if adapter == "llm":
+        llm_config = load_llm_run_config(llm_execution_environ())
+        timeout = llm_config.scenario_timeout_seconds
     with subprocess.Popen(
         [sys.executable, "-m", "veyrix.runner"],
         stdin=subprocess.PIPE,
@@ -41,10 +79,10 @@ def execute_scenario(configuration: dict, scenario_id: str) -> dict:
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
-        env={"PATH": os.defpath, "PYTHONUNBUFFERED": "1"},
+        env=runner_env(adapter, llm_config),
     ) as process:
         try:
-            stdout, _ = process.communicate(json.dumps(payload), timeout=SCENARIO_TIMEOUT)
+            stdout, _ = process.communicate(json.dumps(payload), timeout=timeout)
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGKILL)
             process.communicate()

@@ -10,6 +10,8 @@ ruff check .
 Without `TEST_DATABASE_URL`, PostgreSQL integration tests skip explicitly. Pure engine
 and actual MCP stdio tests still run. MCP tests launch only the bundled example server;
 they use no external network services, production credentials, or external model API.
+LLM adapter tests use a scripted chat transport and an in-process HTTP replay. They do
+not read `VEYRIX_LLM_API_KEY` and they do not call Ollama or a hosted model.
 
 ## PostgreSQL integration
 

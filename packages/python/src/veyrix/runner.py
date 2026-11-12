@@ -17,7 +17,8 @@ def main() -> None:
     if sys.platform == "linux":
         resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024, 512 * 1024 * 1024))
     payload = json.loads(sys.stdin.read(128 * 1024))
-    if payload.get("adapter", "local") == "mcp":
+    adapter = payload.get("adapter", "local")
+    if adapter == "mcp":
         from veyrix.engine.catalog import MCP_SCENARIOS
         from veyrix.mcp_testing.adapter import run_mcp_scenario
 
@@ -29,6 +30,14 @@ def main() -> None:
                 scenario,
                 payload.get("server_variant", "vulnerable"),
             )
+        )
+    elif adapter == "llm":
+        from veyrix.llm.adapter import run_llm_scenario_from_env
+
+        scenario = next(s for s in SCENARIOS if s.id == payload["scenario_id"])
+        # Model name may be snapshotted on the run. The API key stays in the environment.
+        result = run_llm_scenario_from_env(
+            payload["variant"], payload["policy"], scenario, payload.get("model")
         )
     else:
         scenario = next(s for s in SCENARIOS if s.id == payload["scenario_id"])

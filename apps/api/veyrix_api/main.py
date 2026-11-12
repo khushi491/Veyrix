@@ -8,8 +8,10 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from veyrix.engine import ENGINE_VERSION, SCENARIOS, select_scenarios
 from veyrix.engine.catalog import MCP_SCENARIOS
+from veyrix.llm.config import LLMConfigError, load_llm_run_config
 from veyrix.scoring import scoring_manifest
 
+from veyrix_api.config import llm_execution_environ
 from veyrix_api.dependencies import Db, local_access
 from veyrix_api.finding_routes import router as finding_router
 from veyrix_api.finding_routes import summary as finding_summary
@@ -94,22 +96,40 @@ def execute_local_run(agent_id: UUID, db: Db, payload: RunCreate | None = None) 
         selected = select_scenarios(suite, agent.adapter)
     except ValueError as exc:
         raise HTTPException(422, "Selected suite is unavailable for this adapter") from exc
+    environment = "in-memory synthetic fixture"
+    model = None
+    model_transport = None
+    if agent.adapter == "llm":
+        try:
+            llm_config = load_llm_run_config(llm_execution_environ())
+        except LLMConfigError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        model = llm_config.model
+        model_transport = llm_config.transport
+        environment = (
+            "scripted chat-completions transport"
+            if llm_config.transport == "scripted"
+            else "openai-compatible chat completions"
+        )
+    configuration = {
+        "agent_name": agent.name,
+        "adapter": agent.adapter,
+        "server_variant": agent.server_variant,
+        "variant": agent.variant,
+        "policy": agent.policy,
+        "engine_version": ENGINE_VERSION,
+        "environment": environment,
+        "model": model,
+        "suite": suite,
+        "scenarios": [{"id": s.id, "version": s.version} for s in selected],
+        "scoring": scoring_manifest(select_scenarios("all", agent.adapter)),
+    }
+    if model_transport is not None:
+        configuration["model_transport"] = model_transport
     run = TestRun(
         agent_id=agent.id,
         status="queued",
-        configuration={
-            "agent_name": agent.name,
-            "adapter": agent.adapter,
-            "server_variant": agent.server_variant,
-            "variant": agent.variant,
-            "policy": agent.policy,
-            "engine_version": ENGINE_VERSION,
-            "environment": "in-memory synthetic fixture",
-            "model": None,
-            "suite": suite,
-            "scenarios": [{"id": s.id, "version": s.version} for s in selected],
-            "scoring": scoring_manifest(select_scenarios("all", agent.adapter)),
-        },
+        configuration=configuration,
         results=[],
     )
     db.add(run)
@@ -141,6 +161,26 @@ def run_details(run_id: UUID, db: Db) -> TestRun:
     return run
 
 
+def _report_limitations(configuration: dict) -> list[str]:
+    if configuration.get("adapter") != "llm":
+        return [
+            "Deterministic synthetic fixture; no external model evaluated.",
+            "Synthetic fixtures do not establish robustness of external models.",
+            "Only bundled fixtures run in bounded subprocesses; external agent isolation is incomplete.",
+        ]
+    if configuration.get("model_transport") == "scripted":
+        return [
+            "Scripted chat-completions transport; no live model was called.",
+            "Scores and findings come from the same evidence pipeline as the local scenarios.",
+            "This transport checks the pipeline. It does not measure a production model.",
+        ]
+    return [
+        "OpenAI-compatible tool-calling model. The score describes observed tool use on this run only.",
+        "A numeric score is not a certification of the model, provider, or prompt.",
+        "Only bundled synthetic tools can run. The model cannot invoke host commands or real payments.",
+    ]
+
+
 @app.get("/api/runs/{run_id}/report", dependencies=[Local])
 def json_report(run_id: UUID, db: Db) -> Response:
     run = run_details(run_id, db)
@@ -161,11 +201,7 @@ def json_report(run_id: UUID, db: Db) -> Response:
             )
         ],
         "run": RunRead.model_validate(run).model_dump(mode="json"),
-        "limitations": [
-            "Deterministic synthetic fixture; no external model evaluated.",
-            "Synthetic fixtures do not establish robustness of external models.",
-            "Only bundled fixtures run in bounded subprocesses; external agent isolation is incomplete.",
-        ],
+        "limitations": _report_limitations(run.configuration),
     }
     return Response(
         json.dumps(jsonable_encoder(report), indent=2),

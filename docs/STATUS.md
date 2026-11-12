@@ -22,6 +22,9 @@ Tasks are committed and pushed individually after verification.
 8. Versioned scoring: full-catalog coverage gates, deterministic evidence replay,
    severity/authorization weights, execution distinctions and caps, immutable score
    snapshots, comparable-scope history, dashboard breakdowns and JSON report metadata.
-9. Next: SARIF/CLI, developer CI integration and release docs.
+9. Tool-calling model adapter: OpenAI-compatible chat completions, synthetic tool loop,
+   scripted transport for tests, and the existing trace, finding, and score pipeline.
+   Live model calls are optional and are not part of CI.
+10. Next: SARIF/CLI, developer CI integration and release docs.
 
 No security scores, findings, or agent execution results are fabricated.
