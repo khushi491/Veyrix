@@ -110,6 +110,17 @@ The Compose worker stays on an internal network, so it cannot reach Ollama or a 
 
 Tests and CI use `VEYRIX_LLM_TRANSPORT=scripted` with `VEYRIX_LLM_ALLOW_SCRIPTED=1`. That transport does not call a model. Limits and the tool list: [docs/SCENARIOS.md](docs/SCENARIOS.md).
 
+## Command-line scan
+
+`veyrix scan` runs the same scenarios, evidence check, and `calculate_score` path in-process. It does not need Postgres, Redis, or the API. Targets are the local vulnerable and hardened fixtures, the bundled MCP server, or the `llm` adapter. Model, base URL, and API key come from `VEYRIX_LLM_*` environment variables only. Cleartext HTTP stays limited to loopback.
+
+```sh
+veyrix scan --adapter local --variant vulnerable
+veyrix scan --config target.json --format sarif --output results.sarif --fail-under 80
+```
+
+Exit 0 when the scan finishes and every requested gate passes. Exit 1 when the score is below `--fail-under` or a verified finding is at `--fail-on` or higher. Text, JSON, and SARIF 2.1.0 output are documented in [docs/cli.md](docs/cli.md).
+
 ## Tests and CI
 
 [Foundation checks](.github/workflows/checks.yml) run on every push and pull request.
@@ -132,8 +143,6 @@ Full notes: [TESTING.md](TESTING.md). Current scope: [docs/STATUS.md](docs/STATU
 
 Next:
 
-- A CLI that uses the same engine as the API
-- SARIF export
 - A GitHub Action other repositories can run
 - Hosted authentication and project membership
 - Browser end-to-end tests
