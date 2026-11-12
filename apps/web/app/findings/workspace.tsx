@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { Sidebar } from "../sidebar";
 import { ExecutionTrace, type TraceEvent } from "../execution-trace";
+import { api } from "../api-client";
+import { demoMode, readOnlyNote } from "../demo-mode";
 
 type Project = { id: string; name: string };
 type Agent = { id: string; name: string };
@@ -79,29 +81,16 @@ const categories = [
 ];
 const label = (value: string) =>
   value.replaceAll("_", " ").replaceAll("-", " ");
-async function request<T>(
+function request<T>(
   path: string,
-  method = "GET",
+  method: "GET" | "PATCH" = "GET",
   body?: unknown,
-): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+) {
+  return api<T>(path, {
     method,
-    ...(body
-      ? {
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      : {}),
+    body,
+    fallback: "Request failed ({status}). Check the API and migrations.",
   });
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(
-      typeof error?.detail === "string"
-        ? error.detail
-        : `Request failed (${response.status}). Check the API and migrations.`,
-    );
-  }
-  return response.json() as Promise<T>;
 }
 
 export function FindingsWorkspace({
@@ -129,7 +118,7 @@ export function FindingsWorkspace({
           </span>
           <span className="dev">
             <i />
-            Local development
+            {demoMode ? "Read-only snapshot" : "Local development"}
           </span>
         </header>
         <section className="content">
@@ -142,9 +131,13 @@ export function FindingsWorkspace({
                 track remediation.
               </p>
             </div>
-            <a href="/#tests" className="button-link">
-              Run security tests ↗
-            </a>
+            {demoMode ? (
+              <p className="form-hint demo-inline-note">{readOnlyNote}</p>
+            ) : (
+              <a href="/#tests" className="button-link">
+                Run security tests ↗
+              </a>
+            )}
           </div>
           <label htmlFor="finding-project">Project</label>
           <select
@@ -202,7 +195,9 @@ export function FindingsWorkspace({
           <footer>
             <span>Security for Autonomous Intelligence.</span>
             <span>
-              Synthetic fixture assessments · Original evidence preserved
+              {demoMode
+                ? "Public snapshot · Triage disabled"
+                : "Synthetic fixture assessments · Original evidence preserved"}
             </span>
           </footer>
         </section>
@@ -248,7 +243,7 @@ function Explorer({
     queryKey: ["findings", projectId, filters, offset],
     queryFn: () =>
       request<FindingPage>(`/projects/${projectId}/findings?${params}`),
-    refetchInterval: 5000,
+    refetchInterval: demoMode ? false : 5000,
   });
   const detail = useQuery({
     queryKey: ["finding", projectId, selectedId],
@@ -701,13 +696,16 @@ function Triage({
         Changing status records a review decision. It does not alter evidence or
         verify that a fix works.
       </p>
+      {demoMode && <p className="form-hint demo-note">{readOnlyNote}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (demoMode) return;
           setSaved(false);
           mutation.mutate();
         }}
       >
+        <fieldset className="triage-fields" disabled={demoMode}>
         <label htmlFor="triage-status">Status</label>
         <select
           id="triage-status"
@@ -734,12 +732,17 @@ function Triage({
           placeholder="Record the remediation or reason for this decision."
         />
         <button
+          className={demoMode ? "readonly" : undefined}
           disabled={
-            mutation.isPending || status === finding.status || !note.trim()
+            demoMode ||
+            mutation.isPending ||
+            status === finding.status ||
+            !note.trim()
           }
         >
           {mutation.isPending ? "Saving…" : "Save triage decision"}
         </button>
+        </fieldset>
         {mutation.error && (
           <p className="error" role="alert">
             {mutation.error.message}

@@ -7,6 +7,7 @@ import {
   Shield,
   Terminal,
 } from "lucide-react";
+import { demoMode } from "./demo-mode";
 
 export function Sidebar({
   active = "overview",
@@ -21,7 +22,7 @@ export function Sidebar({
         <Shield size={25} /> VEYRIX <span>α</span>
       </a>
       <div className="workspace-label">
-        LOCAL WORKSPACE <CircleDot size={12} />
+        {demoMode ? "READ-ONLY DEMO" : "LOCAL WORKSPACE"} <CircleDot size={12} />
       </div>
       <nav>
         <a href="/" className={active === "overview" ? "active" : ""}>
@@ -52,7 +53,7 @@ export function Sidebar({
         <Terminal size={18} />
         <strong>Built for the boundary.</strong>
         <p>Break your agents before attackers do.</p>
-        <span>LOCAL MVP · v0.1.0</span>
+        <span>{demoMode ? "PUBLIC SNAPSHOT · v0.1.0" : "LOCAL MVP · v0.1.0"}</span>
       </div>
     </aside>
   );

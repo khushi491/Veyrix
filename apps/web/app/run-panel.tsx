@@ -1,6 +1,8 @@
 "use client";
 
 import { RunScore } from "./security-score";
+import { api } from "./api-client";
+import { demoMode, readOnlyNote } from "./demo-mode";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -34,25 +36,12 @@ type Run = {
   results: Result[];
   configuration: Record<string, unknown>;
 };
-async function request<T>(
-  path: string,
-  method = "GET",
-  body?: unknown,
-): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+function request<T>(path: string, method: "GET" | "POST" = "GET", body?: unknown) {
+  return api<T>(path, {
     method,
-    ...(body
-      ? {
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      : {}),
+    body,
+    fallback: "Request failed ({status}). Check the API and migrations.",
   });
-  if (!response.ok)
-    throw new Error(
-      `Request failed (${response.status}). Check the API and migrations.`,
-    );
-  return response.json() as Promise<T>;
 }
 export function RunPanel({
   agents,
@@ -141,6 +130,7 @@ export function RunPanel({
           <select
             aria-label="Security test suite"
             value={suite}
+            disabled={demoMode}
             onChange={(e) => setSuite(e.target.value)}
           >
             <option value="all">
@@ -158,17 +148,22 @@ export function RunPanel({
             ))}
           </select>
           <button
+            className={demoMode ? "readonly" : undefined}
             disabled={
+              demoMode ||
               !agentId ||
               execute.isPending ||
               catalog.isPending ||
               catalog.isError
             }
-            onClick={() => execute.mutate()}
+            onClick={() => {
+              if (!demoMode) execute.mutate();
+            }}
           >
             {execute.isPending ? "Queuing…" : "Run security tests"}
           </button>
         </div>
+        {demoMode && <p className="form-hint demo-note">{readOnlyNote}</p>}
         {(runs.error || execute.error || cancel.error || catalog.error) && (
           <p className="error" role="alert">
             {runs.error?.message ||
@@ -309,15 +304,28 @@ export function RunPanel({
                 </p>
               )}
             {run &&
-              !["queued", "running", "cancelling"].includes(run.status) && (
+              !["queued", "running", "cancelling"].includes(run.status) &&
+              (demoMode ? (
+                <button
+                  className="secondary"
+                  type="button"
+                  onClick={() => {
+                    void import("./demo-api").then(({ downloadReport }) =>
+                      downloadReport(run.id),
+                    );
+                  }}
+                >
+                  Download JSON assessment
+                </button>
+              ) : (
                 <a
                   className="export-link"
-                  href={`/api/runs/${run?.id}/report`}
+                  href={`/api/runs/${run.id}/report`}
                   download
                 >
                   Download JSON assessment ↗
                 </a>
-              )}
+              ))}
           </>
         ) : (
           !runs.isFetching && (
