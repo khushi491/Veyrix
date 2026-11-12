@@ -107,6 +107,13 @@ export function KitView({ loaded }: { loaded: LoadedKit }) {
           <a href={bundle.action_docs_url} target="_blank" rel="noopener noreferrer">
             Action and SARIF reference
           </a>
+          <a
+            href="https://github.com/khushi491/Veyrix/blob/main/docs/red-team-kit.md"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            What the kit catches
+          </a>
         </div>
         <div className="demo-compare" id="scores">
           <ScoreCard report={vulnerable} tone="vulnerable" />
