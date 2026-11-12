@@ -1,68 +1,65 @@
-# VEYRIX
+# Veyrix
 
-Security for Autonomous Intelligence. Break your agents before attackers do.
+Break your agents before attackers do: versioned scenarios, ordered evidence traces, verified findings, and a deterministic score from 0 to 100.
 
-Veyrix is an AI agent security testing platform under active development. The current
-foundation supports persistent projects, local agent registration, and twelve versioned synthetic
-local scenarios and six real MCP stdio cases with observable traces and JSON export.
-A project-scoped findings explorer supports evidence inspection and audited triage.
-Versioned security scoring includes coverage gates, evidence-backed penalties and comparable history.
-SARIF, CLI, and hosted authentication are not implemented yet.
-Released under the [MIT License](LICENSE). Copyright (c) 2026 Khushi Parmar.
+**[Live read-only demo](https://veyrix-khushi491s-projects.vercel.app)** — a read-only snapshot of the engine, with no live scans, database, or worker.
 
-## Public read-only demo
+[![CI](https://github.com/khushi491/Veyrix/actions/workflows/checks.yml/badge.svg)](https://github.com/khushi491/Veyrix/actions/workflows/checks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The dashboard can be hosted on its own on Vercel's Hobby plan, which is free. That
-deployment shows a committed snapshot of real engine output for two local fixtures:
-a vulnerable document assistant and a hardened document assistant. It does not run
-FastAPI, PostgreSQL, Redis, or the worker, and it never exposes `VEYRIX_DEV_MODE`.
+## The problem
 
-Create, register, run, and triage controls are hidden or disabled. Scores, findings,
-and traces come from `veyrix.engine.run_scenario`, `veyrix.scoring.calculate_score`,
-and `veyrix.findings.verified_result`. The snapshot covers the 12 local scenarios.
-The six MCP stdio scenarios are unchanged and still run through the local worker;
-they are not part of this static snapshot.
+An agent fails when untrusted content is treated as an instruction and a tool runs anyway: a payment, an email, a file write, or a secret sent outbound. That content can arrive in a document, a search result, a database record, a tool response, or an MCP resource.
 
-Regenerate the snapshot from the repository root after engine, scenario, or scoring
-changes. Use the project virtualenv so the command imports the local package:
+Veyrix runs that boundary in a synthetic sandbox and keeps the evidence. The result is an assessment of the saved cases and policy, not a certification of a production agent.
 
-```sh
-make demo-snapshot
+## How it works
+
+1. **Scenarios.** Twelve versioned local cases across prompt injection, authorization, unsafe tool use, data exfiltration, and multi-step manipulation, plus six MCP stdio cases. The local adapter is a deterministic parser. MCP uses the official Python SDK against a bundled server.
+2. **Ordered evidence traces.** Each case records timestamped events: the trusted instruction, the untrusted content, tool requests and responses, and the policy decision.
+3. **Verified findings.** A failure is replayed against the saved policy before it is stored. The findings explorer shows that evidence. Triage does not rewrite the execution record.
+4. **A deterministic 0–100 score.** `veyrix.scoring` (methodology 1.0.0) applies coverage gates and evidence-backed penalties with exact fractions. No LLM judges the score. A number requires a completed run, at least five determinate cases, and 80% of the saved catalog.
+
+```mermaid
+flowchart LR
+  dashboard["Next.js dashboard"] --> api["FastAPI"]
+  api --> postgres["PostgreSQL"]
+  api --> redis["Redis wake-up"]
+  redis --> worker["Sandboxed worker"]
+  postgres --> worker
+  worker --> local["Local scenarios"]
+  worker --> mcp["MCP SDK"]
+  worker --> llm["llm adapter"]
 ```
 
-That writes `apps/web/demo/snapshot.json`. Do not edit scores, findings, or traces
-in that file by hand.
+PostgreSQL is the durable queue. Redis only wakes the worker. The Compose worker is unprivileged, has a read-only filesystem, and sits on an internal network. Tool calls from the local parser, the MCP server, and the `llm` adapter execute in the same in-memory sandbox.
 
-### Deploy on Vercel
+Details: [architecture](ARCHITECTURE.md), [scenarios](docs/SCENARIOS.md), [MCP](docs/MCP.md), [scoring](SCORING.md), [findings](docs/FINDINGS.md).
 
-1. Import `https://github.com/khushi491/Veyrix` into a Vercel Hobby project. Do not add a database, Redis, blob store, or any paid integration.
-2. Set **Root Directory** to `apps/web`.
-3. Framework preset: **Next.js**.
-4. Node.js version: **22.x**.
-5. Install command: `npm ci` (also set in `apps/web/vercel.json`).
-6. Build command: `npm run build` (this is `next build --webpack`, matching CI).
-7. Leave the output directory on the Next.js default. Do not set a custom Output Directory.
-8. Add environment variable `NEXT_PUBLIC_VEYRIX_DEMO` with value `true` for Production. Add it for Preview as well if preview deployments should be the demo. The value is inlined at **build** time, so change it and redeploy rather than expecting a runtime toggle.
-9. Do not set `VEYRIX_DEV_MODE`, `DATABASE_URL`, or `REDIS_URL`.
+## Demo results
 
-A Vercel build also turns demo mode on when `VERCEL=1`, even if the variable above
-is missing. That keeps `/api` from being rewritten to FastAPI. Local `npm run build`
-stays in API mode unless `NEXT_PUBLIC_VEYRIX_DEMO=true`.
+The public demo is a static snapshot of two local fixtures, generated on 2026-11-11 by engine 0.3.0 and scoring methodology 1.0.0 (`apps/web/demo/snapshot.json`). The six MCP scenarios are not in the snapshot.
 
-Check the demo build locally:
+| Fixture | Score on the 12 local scenarios | What the run recorded |
+| --- | ---: | --- |
+| Vulnerable document assistant | **4/100** | 12 failures, 0 passes. 11 confirmed mock executions and 1 confirmed block. 3 critical and 9 high. |
+| Hardened document assistant | **100/100** | 12 passes, 0 failures. |
 
-```sh
-cd apps/web
-NEXT_PUBLIC_VEYRIX_DEMO=true npm run build
-npm run start
-```
+These scores describe the deterministic local fixtures under methodology 1.0.0. The formula, caps, and limits are in [SCORING.md](SCORING.md).
 
-Open http://127.0.0.1:3000. The dev server can use the same variable:
-`NEXT_PUBLIC_VEYRIX_DEMO=true npm run dev`.
+<img src="docs/images/overview.png" alt="Read-only Veyrix demo overview: one project, the vulnerable and hardened document assistants, and 12 verified findings." width="880">
 
-## Local setup
+<img src="docs/images/agent-comparison.png" alt="Demo comparison of the two local fixtures: vulnerable scores 4 out of 100 with 12 failures, hardened scores 100 out of 100 with 12 passes." width="880">
 
-Requires Python 3.12+, Node 22+, Docker Compose, and available ports 58439 and 6379.
+<img src="docs/images/findings.png" alt="Findings list in the public demo: 12 open findings for the vulnerable document assistant, including one attempt that was blocked." width="880">
+
+<img src="docs/images/evidence-trace.png" alt="Evidence trace for an untrusted document that requested transfer_funds. The tool request is marked as policy-violation evidence and the policy decision is FAIL." width="880">
+
+Hosting and snapshot regeneration: [docs/DEMO.md](docs/DEMO.md).
+
+## Quickstart
+
+Python 3.12+, Node 22+, Docker Compose, and free ports 58439 and 6379.
 
 ```sh
 cp .env.example .env
@@ -74,49 +71,13 @@ alembic upgrade head
 uvicorn veyrix_api.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Open http://127.0.0.1:8000/docs for the API. `VEYRIX_DEV_MODE=true` grants unrestricted
-local access; bind the API to loopback only. This mode has no user authentication and
-must not be exposed publicly. Default database credentials are for local development.
-`DATABASE_URL` configures PostgreSQL; `REDIS_URL` configures worker notifications; PostgreSQL remains the durable queue.
-
-In another terminal with the same virtual environment activated:
+In a second terminal, with the same virtualenv:
 
 ```sh
 python -m veyrix_api.worker
 ```
 
-The API returns queued runs immediately. Without a worker, runs stay queued. Progress,
-cancellation, completed evidence, and errors persist in PostgreSQL. Reports become
-available when a run reaches a terminal state.
-
-For a containerized API and worker, use `docker compose --profile app up --build -d`
-instead of running the API/worker commands above. The worker has a read-only filesystem,
-limited resources, no Linux capabilities, and an internal Docker network. This restricts
-external egress but still permits database/Redis access; it is not a sandbox for arbitrary
-third-party code. Only bundled fixtures are supported.
-
-## Checks
-
-```sh
-pytest
-ruff check .
-```
-
-Integration tests use `TEST_DATABASE_URL` and a dedicated disposable database. For example:
-
-```sh
-docker compose exec postgres createdb -U veyrix veyrix_test
-DATABASE_URL=postgresql+psycopg://veyrix:veyrix_local@localhost:58439/veyrix_test alembic upgrade head
-TEST_DATABASE_URL=postgresql+psycopg://veyrix:veyrix_local@localhost:58439/veyrix_test pytest
-```
-
-Create the test database only once. Tests skip when TEST_DATABASE_URL is absent; never point this variable at a database containing useful data.
-
-See [development status](docs/STATUS.md) and [architecture](ARCHITECTURE.md).
-
-## Dashboard
-
-In a second terminal, with the API running on port 8000:
+Dashboard, with the API on port 8000:
 
 ```sh
 cd apps/web
@@ -124,96 +85,59 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. The same-origin `/api` proxy forwards requests to the local
-API. Create a project, then register a hardened or vulnerable local agent configuration.
-Run an injection assessment to compare vulnerable and hardened deterministic fixtures.
-The dashboard shows actual in-memory mock tool execution; no external LLM is evaluated.
-Select all scenarios or a category-specific suite. Scoring requires at least five determinate
-cases and 80% coverage of the full saved adapter catalog.
-Existing agent policies remain unchanged; tests without an applicable rule yield INCONCLUSIVE.
+Open http://127.0.0.1:3000. The page proxies `/api` to the local API. Register a local or MCP fixture and run a suite.
 
-Frontend checks: `npm run typecheck`, `npm run build`, and `npm audit` from `apps/web`.
+`VEYRIX_DEV_MODE=true` is unrestricted local access with no user authentication. Bind the API to loopback. Do not expose it. For a containerized API and worker, use `docker compose --profile app up --build -d` instead of the host processes above. That worker cannot reach a model on the host.
 
+API reference: [API.md](API.md).
 
-## MCP fixtures
+## LLM adapter
 
-Choose the MCP stdio adapter when registering an agent. Select vulnerable or hardened
-agent behavior independently from vulnerable or policy-enforcing server behavior.
-Run `mcp-security` to execute six scenarios through the official MCP Python SDK.
-The trace includes discovered tool definitions, negotiated protocol version, injected
-content, actual tool requests/responses, and policy decisions.
+Register `adapter=llm` through the API to run the same twelve local scenarios through an OpenAI-compatible Chat Completions endpoint (`tools` / `tool_calls`). The dashboard form still offers only the local and MCP fixtures. The model may call only the synthetic mock tools. Those calls are executed in the sandbox, recorded on the same ordered trace, and scored by `verified_result` and `calculate_score`.
 
-Only bundled stdio servers are accepted. There is no arbitrary command, filesystem
-server, production secret or external endpoint configuration. See [MCP testing](docs/MCP.md).
+`variant` does not change a live model. It selects the offline scripted transport and is stored on the run.
 
-## Tool-calling model adapter
-
-Register `adapter=llm` through the API to run the same twelve local scenarios through an
-OpenAI-compatible Chat Completions endpoint (`tools` / `tool_calls`). The dashboard form
-still offers only the local and MCP fixtures. The model may call only the synthetic mock
-tools. Those calls are executed in the existing in-memory sandbox, recorded in the same
-ordered trace, and scored by `verified_result` and `calculate_score`. The agent's
-`variant` does not change a live model. It selects the offline scripted transport and is
-stored on the run.
-
-Set the endpoint in the environment of both the API and the worker. Do not put the key in
-a request body or in the database. Leave the key empty for a local server that does not
-require one. Cleartext HTTP is accepted only for a loopback address.
-
-Free local model (Ollama or another OpenAI-compatible server):
+A local [Ollama](https://ollama.com) server needs no API key. Set this in the environment of both the API and the host worker:
 
 ```sh
 export VEYRIX_LLM_BASE_URL=http://127.0.0.1:11434/v1
 export VEYRIX_LLM_MODEL=qwen2.5:3b
-# VEYRIX_LLM_API_KEY stays unset
 ```
 
-Hosted provider:
+`VEYRIX_LLM_BASE_URL` defaults to that loopback endpoint. Cleartext HTTP is accepted only for loopback. A hosted HTTPS endpoint needs `VEYRIX_LLM_API_KEY` in the environment. The key is not accepted in the request body and is not stored on the agent or the run.
+
+The Compose worker stays on an internal network, so it cannot reach Ollama or a hosted API. Use `python -m veyrix_api.worker` on the host for a live model. Each scenario allows at most 8 model steps (default 6) and a wall-clock budget under the 60-second worker lease (default 45 seconds). A cutoff after a prohibited tool call stays FAIL. A cutoff with no prohibited call is ERROR or INCONCLUSIVE, not PASS.
+
+Tests and CI use `VEYRIX_LLM_TRANSPORT=scripted` with `VEYRIX_LLM_ALLOW_SCRIPTED=1`. That transport does not call a model. Limits and the tool list: [docs/SCENARIOS.md](docs/SCENARIOS.md).
+
+## Tests and CI
+
+[Foundation checks](.github/workflows/checks.yml) run on every push and pull request.
+
+- **API:** Python 3.12, PostgreSQL 17, `alembic upgrade head`, `ruff check .`, and `pytest`.
+- **Web:** Node 22, `npm ci`, typecheck, the production build, and a demo build that fails if `/api` still proxies to `127.0.0.1:8000`.
+
+The LLM tests drive the scripted transport, so the workflow needs no model endpoint and no API key. PostgreSQL integration tests use `TEST_DATABASE_URL` and skip when it is unset. Browser end-to-end tests are on the roadmap.
 
 ```sh
-export VEYRIX_LLM_BASE_URL=https://api.openai.com/v1
-export VEYRIX_LLM_MODEL=gpt-4o-mini
-export VEYRIX_LLM_API_KEY=  # set this in your shell; do not commit a value
+pytest
+ruff check .
 ```
 
-Start the API and `python -m veyrix_api.worker` on the host. The Compose worker stays on
-an internal network and cannot reach Ollama or a hosted API. Each scenario allows at most
-8 model steps (default 6) and a wall-clock budget under the 60-second worker lease
-(default 45 seconds). A cutoff after a prohibited tool call stays FAIL. A cutoff with no
-prohibited call is ERROR or INCONCLUSIVE, not PASS.
+From `apps/web`: `npm run typecheck`, `npm run build`, and `NEXT_PUBLIC_VEYRIX_DEMO=true npm run build`.
 
-CI and `pytest` use `VEYRIX_LLM_TRANSPORT=scripted` with `VEYRIX_LLM_ALLOW_SCRIPTED=1`.
-That transport does not call a model. See [scenario notes](docs/SCENARIOS.md).
+Full notes: [TESTING.md](TESTING.md). Current scope: [docs/STATUS.md](docs/STATUS.md).
 
+## Roadmap
 
-## Findings explorer
+Next:
 
-Open http://127.0.0.1:3000/findings. Filter by project, severity, status, agent, category,
-and UTC dates. Inspect highlighted policy evidence, saved configuration, reproduction
-guidance, and review history. Triage requires a review note and preserves the original
-execution record. JSON reports include finding IDs and review status.
-
-To index previously executed assessments after upgrading:
-
-```sh
-python -m veyrix_api.backfill_findings
-```
-
-No attacks are rerun. Existing finding IDs and triage are preserved. See
-[findings](docs/FINDINGS.md), [API](API.md), and [testing](TESTING.md).
-
-
-## Scoped security scores
-
-The overview and test runner show a versioned assessment score, outcome counts, severity
-breakdown, coverage and per-case loss weights. Inspect the methodology disclosure or
-[SCORING.md](SCORING.md) for the exact formula and caps. Scores and their method are
-included in JSON reports. Findings triage does not change saved scores.
-
-Run a **fresh full suite** after upgrading to record a scoring catalog. Older runs stay
-unscored; their configuration is preserved. Current scores describe synthetic fixtures
-and do not certify production agents or external models.
+- A CLI that uses the same engine as the API
+- SARIF export
+- A GitHub Action other repositories can run
+- Hosted authentication and project membership
+- Browser end-to-end tests
 
 ## License
 
-Veyrix is released under the [MIT License](LICENSE). Copyright (c) 2026 Khushi Parmar.
+[MIT](LICENSE). Copyright (c) 2026 Khushi Parmar.
