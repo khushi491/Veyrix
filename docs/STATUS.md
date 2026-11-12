@@ -31,5 +31,9 @@ Tasks are committed and pushed individually after verification.
     The self-test workflow scans the local fixtures on pull requests, a daily schedule,
     and workflow_dispatch. SARIF upload needs `security-events: write` and is skipped
     for fork pull requests. Live model calls are not part of CI.
+12. Always-on kit readout: `/kit` shows the scheduled local-fixture scans, with a
+    committed `veyrix scan` snapshot as the fallback. The schedule publishes JSON to
+    the `kit-scans` branch and does not commit to `main`. No new secret, deploy hook,
+    or model call.
 
 No security scores, findings, or agent execution results are fabricated.

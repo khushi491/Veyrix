@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "next dev --webpack --hostname 127.0.0.1",
+    "prebuild": "node scripts/refresh-kit-scan.mjs",
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit"

@@ -4,10 +4,14 @@ export function DemoBanner() {
   return (
     <div className="demo-banner" role="note">
       <p>
-        Read-only static snapshot of the Veyrix engine. No live scans, database,
-        or worker are connected.
+        Read-only demo. The workspace is a static snapshot: no database, worker,
+        or model calls. The red-team kit shows the scheduled scan of the sample
+        fixtures.
       </p>
-      <a href={repositoryUrl}>View the repository</a>
+      <span className="demo-banner-links">
+        <a href="/kit">Red-team kit</a>
+        <a href={repositoryUrl}>Repository</a>
+      </span>
     </div>
   );
 }

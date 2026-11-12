@@ -56,7 +56,7 @@ These scores describe the deterministic local fixtures under methodology 1.0.0. 
 
 <img src="docs/images/evidence-trace.png" alt="Evidence trace for an untrusted document that requested transfer_funds. The tool request is marked as policy-violation evidence and the policy decision is FAIL." width="880">
 
-Hosting and snapshot regeneration: [docs/DEMO.md](docs/DEMO.md).
+The route `/kit` is the always-on readout of the GitHub Action: the same two fixtures, with the scan time, engine and scoring versions, verified findings, and one full evidence trace. It reads a scheduled JSON publication and falls back to `apps/web/demo/kit-scan.json` until that publication exists. Hosting, the publication branch, and snapshot regeneration: [docs/DEMO.md](docs/DEMO.md).
 
 ## Quickstart
 
@@ -141,7 +141,7 @@ steps:
       upload-sarif: "true"
 ```
 
-`security-events: write` is required for the upload. Fork pull requests and Dependabot runs skip it. Inputs, the daily self-test, and an optional local Ollama scan are in [docs/github-action.md](docs/github-action.md).
+`security-events: write` is required for the upload. Fork pull requests and Dependabot runs skip it. Inputs, the daily self-test, the public `/kit` readout, and an optional local Ollama scan are in [docs/github-action.md](docs/github-action.md).
 
 ## Tests and CI
 

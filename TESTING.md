@@ -51,6 +51,7 @@ npm audit
 ```
 
 `make demo-snapshot` regenerates `apps/web/demo/snapshot.json` from the local engine.
+`make kit-snapshot` regenerates `apps/web/demo/kit-scan.json` from `veyrix scan`.
 `tests/test_demo_snapshot.py` checks that file against a fresh run, `calculate_score`,
 and `verified_result`. The demo build omits the `/api` rewrite to FastAPI.
 
