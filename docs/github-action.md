@@ -149,14 +149,16 @@ Use a different `category` for each SARIF upload in one workflow. GitHub keeps o
 
 | Job | Target | Gate | Code scanning |
 | --- | --- | --- | --- |
-| Vulnerable fixture | [`examples/targets/local-vulnerable.json`](../examples/targets/local-vulnerable.json) | none | SARIF uploaded as `veyrix-local-vulnerable` |
-| Hardened fixture | [`examples/targets/local-hardened.json`](../examples/targets/local-hardened.json) | `fail-under: 100` | not uploaded |
+| Vulnerable fixture | `adapter: local`, `variant: vulnerable` | none | SARIF uploaded as `veyrix-local-vulnerable` |
+| Hardened fixture | `adapter: local`, `variant: hardened` | `fail-under: 100` | not uploaded |
 
 On the current engine the vulnerable fixture scores **4/100** with **12** verified findings, and the hardened fixture scores **100/100** with **0** findings. The workflow fails if those results change. The vulnerable job stays green when findings exist, because no gate is set. The hardened job fails if the score drops below 100.
 
 Both jobs upload the JSON report and the SARIF file as artifacts (`veyrix-local-vulnerable` and `veyrix-local-hardened`).
 
-The vulnerable upload points code scanning at the sample config file. Those alerts are the deliberately vulnerable document assistant. They are not a review of the Veyrix product source as an agent. The schedule (`17 6 * * *` UTC) and `workflow_dispatch` run only after this workflow file is on the default branch. Fork pull requests skip the upload and the self-test expects `sarif-uploaded` to be `false` in that case.
+The workflow passes adapter and variant flags instead of a config file. The SARIF artifact is `veyrix-target.json`, which is not a file in the repository. GitHub fails the tool's code scanning check when error-level results sit on lines a pull request adds or edits. A config file added in the same pull request does that, so the self-test does not anchor the sample findings on [`examples/targets/local-vulnerable.json`](../examples/targets/local-vulnerable.json). Those example files are the same fixtures for a caller who wants the alerts on a real path. Findings from this upload are the deliberately vulnerable document assistant. They are not a review of the Veyrix product source as an agent.
+
+A caller that sets `config` to a file the pull request changes, and uploads results at SARIF level `error` (critical and high in the CLI), will see GitHub fail the code scanning check. That is separate from `fail-under` and `fail-on`. The schedule (`17 6 * * *` UTC) and `workflow_dispatch` run only after this workflow file is on the default branch. Fork pull requests skip the upload and the self-test expects `sarif-uploaded` to be `false` in that case.
 
 ## Optional Ollama scan
 

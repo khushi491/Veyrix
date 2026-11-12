@@ -322,8 +322,9 @@ def test_workflow_and_action_declare_the_scan_contract():
     assert "uses: ./" in workflow
     assert 'cron: "17 6 * * *"' in workflow
     assert "workflow_dispatch" in workflow
-    assert "examples/targets/local-vulnerable.json" in workflow
-    assert "examples/targets/local-hardened.json" in workflow
+    assert "adapter: local" in workflow
+    assert "variant: vulnerable" in workflow
+    assert "variant: hardened" in workflow
     assert 'fail-under: "100"' in workflow
     assert 'upload-sarif: "true"' in workflow
     assert "security-events: write" in workflow

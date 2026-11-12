@@ -26,12 +26,16 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v4
 
+      # Flags, not a config file: SARIF then points at veyrix-target.json, which is not
+      # in the diff. GitHub fails the code scanning check when error-level results sit
+      # on lines this pull request adds.
       - name: Scan the vulnerable document assistant
         id: scan
         uses: ./
         continue-on-error: true
         with:
-          config: examples/targets/local-vulnerable.json
+          adapter: local
+          variant: vulnerable
           output: veyrix-results/vulnerable.json
           upload-sarif: "true"
           category: veyrix-local-vulnerable
@@ -93,7 +97,8 @@ jobs:
         uses: ./
         continue-on-error: true
         with:
-          config: examples/targets/local-hardened.json
+          adapter: local
+          variant: hardened
           fail-under: "100"
           output: veyrix-results/hardened.json
           upload-sarif: "false"
