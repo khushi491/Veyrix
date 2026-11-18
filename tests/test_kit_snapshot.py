@@ -230,6 +230,16 @@ def test_publish_branch_script_does_not_update_main(tmp_path):
     )
 
 
+def test_kit_page_reads_the_publication_on_each_request():
+    loader = (ROOT / "apps" / "web" / "lib" / "kit-scan.ts").read_text(encoding="utf-8")
+    page = (ROOT / "apps" / "web" / "app" / "kit" / "page.tsx").read_text(encoding="utf-8")
+    assert 'cache: "no-store"' in loader
+    assert "revalidate: 900" not in loader
+    assert "revalidate: 900" not in page
+    assert 'export const dynamic = "force-dynamic"' in page
+    assert "export const revalidate" not in page
+
+
 def test_workflow_publishes_off_main_and_skips_pull_requests():
     workflow = (ROOT / ".github" / "workflows" / "veyrix-scan.yml").read_text(encoding="utf-8")
     script = SCRIPT.read_text(encoding="utf-8")

@@ -3,7 +3,10 @@ import { loadKitScan } from "../../lib/kit-scan";
 import { Sidebar } from "../sidebar";
 import { KitView } from "./view";
 
-export const revalidate = 900;
+// Read the publication on every request. `revalidate` prerenders this route and
+// serves that HTML while a new one is generated in the background, so a visitor
+// can keep seeing an older kit-scans file for hours after it is published.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Red-team kit | Veyrix",

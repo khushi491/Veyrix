@@ -10,7 +10,8 @@
     "prebuild": "node scripts/refresh-kit-scan.mjs",
     "build": "next build --webpack",
     "start": "next start --hostname 127.0.0.1",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test lib/kit-select.test.mts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",

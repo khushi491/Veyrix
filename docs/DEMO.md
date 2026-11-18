@@ -65,13 +65,17 @@ deploy hook.
    keeps working.
 4. The dashboard fetches
    `https://raw.githubusercontent.com/khushi491/Veyrix/kit-scans/latest.json`
-   and revalidates it every 15 minutes. A publication for the same commit as the
-   deployment is preferred. Otherwise a newer publication is used when the engine
-   and scoring versions match. Links in that file are shown only when they point
-   at this repository or GitHub's code-scanning docs.
-5. If the fetch fails, the file is invalid, or it is older than the copy shipped
-   with the deployment, `/kit` renders `apps/web/demo/kit-scan.json`. That file is
-   `veyrix scan` output. Regenerate it with `make kit-snapshot` after engine or
+   on each request to `/kit`. The route is dynamic, so a new file shows up
+   without a redeploy. A publication for the same commit as the deployment is
+   preferred when the engine and scoring versions match. Otherwise a newer
+   publication is used when those versions match. Links in that file are shown
+   only when they point at this repository or GitHub's code-scanning docs.
+5. If the fetch fails, the file is invalid, the engine or scoring version does
+   not match, or the publication is older than the copy shipped with the
+   deployment, `/kit` renders that shipped scan. The committed copy is
+   `apps/web/demo/kit-scan.json`. A build may also write a newer
+   `kit-scan.generated.json` beside it. That file is `veyrix scan` output.
+   Regenerate the committed copy with `make kit-snapshot` after engine or
    scoring changes. Do not edit scores or traces by hand.
 6. On Vercel (`VERCEL=1`), the web build also tries to run `veyrix scan` when the
    repository root and Python 3.12 are available. Install or scan failures are
