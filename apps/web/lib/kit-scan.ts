@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import committedJson from "../demo/kit-scan.json";
+import committedJson from "../demo/kit-scan.json" with { type: "json" };
 import type { TraceEvent } from "../app/execution-trace";
+import { selectKit } from "./kit-select.mjs";
 
 export const KIT_SCAN_URL =
   "https://raw.githubusercontent.com/khushi491/Veyrix/kit-scans/latest.json";
@@ -205,23 +206,22 @@ function readGenerated(): unknown {
   }
 }
 
-function sameEngine(remote: KitBundle, local: KitBundle) {
-  return (["vulnerable", "hardened"] as const).every(
-    (variant) =>
-      remote.scans[variant].engine_version === local.scans[variant].engine_version &&
-      remote.scans[variant].scoring_version === local.scans[variant].scoring_version,
-  );
-}
-
 async function fetchRemote(): Promise<KitBundle | null> {
   const configured = process.env.VEYRIX_KIT_SCAN_URL;
   if (configured === "off" || configured === "") return null;
   const url = configured || KIT_SCAN_URL;
   try {
+    // Do not use the Next.js data cache. A `revalidate` fetch is
+    // stale-while-revalidate: the request that should observe a new
+    // publication is handed the previous body, and a prerendered page then
+    // keeps that body until a later visit. Read the file on this request.
     const response = await fetch(url, {
-      next: { revalidate: 900 },
+      cache: "no-store",
       signal: AbortSignal.timeout(8000),
-      headers: { accept: "application/json" },
+      headers: {
+        accept: "application/json",
+        "cache-control": "no-cache",
+      },
     });
     if (!response.ok) return null;
     if (!configured) {
@@ -248,38 +248,5 @@ export async function loadKitScan(): Promise<LoadedKit> {
       : committed;
   const remote = await fetchRemote();
   const deploymentSha = process.env.VERCEL_GIT_COMMIT_SHA || null;
-  if (
-    remote?.source === "github-actions" &&
-    deploymentSha !== null &&
-    remote.sha === deploymentSha
-  ) {
-    return {
-      bundle: remote,
-      reason:
-        "This deployment was built from the same commit the scheduled scan ran.",
-    };
-  }
-  if (
-    remote &&
-    sameEngine(remote, local) &&
-    stamp(remote.published_at) >= stamp(local.published_at)
-  ) {
-    return {
-      bundle: remote,
-      reason:
-        "The scheduled publication is newer than the scan shipped with this deployment.",
-    };
-  }
-  if (local.source === "build") {
-    return {
-      bundle: local,
-      reason:
-        "Showing the scan generated while this site was built. The scheduled publication is not newer.",
-    };
-  }
-  return {
-    bundle: local,
-    reason:
-      "Showing the scan committed with this deployment. The scheduled publication is not available yet, or it is older or from a different engine.",
-  };
+  return selectKit({ remote, local, deploymentSha });
 }

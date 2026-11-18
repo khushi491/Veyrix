@@ -82,8 +82,9 @@ export function KitView({ loaded }: { loaded: LoadedKit }) {
         <p className="kit-prose">
           The daily workflow writes <code>latest.json</code> to the{" "}
           <code>kit-scans</code> branch and does not commit to <code>main</code>.
-          This page rechecks that file about every 15 minutes. Until the file
-          exists, the readout is the scan committed with this deployment.
+          This page reads that file on each request, so a new publication shows
+          up without a redeploy. If the file is missing, malformed, or from a
+          different engine, the readout is the scan shipped with this deployment.
         </p>
         <div className="kit-links">
           {bundle.run_url ? (
@@ -251,9 +252,9 @@ export function KitView({ loaded }: { loaded: LoadedKit }) {
                 the JSON report. Fork pull requests skip the SARIF upload.
               </li>
               <li>
-                Freshness can lag the workflow by about 15 minutes, plus the
-                GitHub raw-file cache. No deploy hook and no repository secret
-                are required for the fallback.
+                This page fetches the published JSON on each request. GitHub may
+                cache that file for a few minutes. No deploy hook and no
+                repository secret are required for the fallback.
               </li>
             </ul>
           </div>
