@@ -131,8 +131,9 @@ jobs:
             exit 1
           fi
 
-  # Writes kit-scans/latest.json for the public dashboard. Pull requests do not
-  # publish. The push refspec is refs/heads/kit-scans, never main. No new secret:
+  # Writes kit-scans/latest.json for the public dashboard, and apps/web/vercel.json
+  # so Vercel does not deploy that data branch. Pull requests do not publish.
+  # The push refspec is refs/heads/kit-scans, never main. No new secret:
   # the job uses the built-in GITHUB_TOKEN. continue-on-error keeps a token or
   # branch-permission failure from hiding the fixture results above.
   publish-kit-scan:

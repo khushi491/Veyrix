@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
 # Publish latest.json on the kit-scans branch.
 # This script never updates main. The refspec below is the only push.
+#
+# The same commit writes apps/web/vercel.json from kit-scans.vercel.json.
+# Project veyrix builds Root Directory apps/web and reads vercel.json from that
+# directory on the commit being deployed. A rule that exists only on main is
+# not consulted for this branch, and an Ignored Build Step runs inside
+# apps/web after clone. Without that directory the build fails first.
+# git.deploymentEnabled tells Vercel not to create a deployment.
+# ignoreCommand exits 0, which cancels a build if one still starts.
 
 set -euo pipefail
 
 src="${1:?path to latest.json}"
 branch="kit-scans"
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+skip_config="${script_dir}/kit-scans.vercel.json"
 
 if [ ! -f "$src" ]; then
   echo "Scan JSON not found: $src" >&2
+  exit 1
+fi
+
+if [ ! -f "$skip_config" ]; then
+  echo "Vercel skip config not found: $skip_config" >&2
   exit 1
 fi
 
@@ -59,10 +74,12 @@ if git -C "$workdir" ls-remote --exit-code "$remote" "refs/heads/${branch}" >/de
   git -C "$workdir" checkout -q -B "$branch" "refs/remotes/origin/${branch}"
 fi
 
+mkdir -p "$workdir/apps/web"
 cp "$src" "$workdir/latest.json"
-git -C "$workdir" add latest.json
+cp "$skip_config" "$workdir/apps/web/vercel.json"
+git -C "$workdir" add latest.json apps/web/vercel.json
 if git -C "$workdir" diff --cached --quiet; then
-  echo "kit-scans already matches this scan JSON"
+  echo "kit-scans already matches this scan JSON and Vercel skip config"
   exit 0
 fi
 
