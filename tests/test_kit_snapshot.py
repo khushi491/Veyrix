@@ -19,6 +19,8 @@ from veyrix.kit_snapshot import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / ".github" / "veyrix-action" / "publish_kit_branch.sh"
+SKIP_CONFIG = ROOT / ".github" / "veyrix-action" / "kit-scans.vercel.json"
+PUBLISH_MESSAGE = "Publish scheduled scan of the local fixtures."
 DROP = {
     "timestamp",
     "created_at",
@@ -49,6 +51,58 @@ def scrub(value):
 
 def canonical(document):
     return scrub(json.loads(json.dumps(document)))
+
+
+def git_text(remote, *args):
+    return subprocess.check_output(["git", "--git-dir", str(remote), *args], text=True)
+
+
+def publish_env(remote):
+    env = os.environ.copy()
+    env.pop("GITHUB_ACTIONS", None)
+    env.pop("GITHUB_TOKEN", None)
+    env["VEYRIX_KIT_PUSH_REMOTE"] = str(remote)
+    return env
+
+
+def run_publish(remote, payload):
+    return subprocess.run(
+        ["bash", str(SCRIPT), str(payload)],
+        check=False,
+        env=publish_env(remote),
+        text=True,
+        capture_output=True,
+    )
+
+
+def seed_main(tmp_path):
+    remote = tmp_path / "remote.git"
+    seed = tmp_path / "seed"
+    subprocess.run(["git", "init", "--bare", "-b", "main", str(remote)], check=True)
+    subprocess.run(["git", "init", "-b", "main", str(seed)], check=True)
+    subprocess.run(
+        ["git", "-C", str(seed), "config", "user.email", "tester@example.com"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "Tester"], check=True)
+    (seed / "README").write_text("main stays untouched\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(seed), "add", "README"], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "seed main"], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", str(remote), "HEAD:refs/heads/main"], check=True)
+    return remote
+
+
+def assert_kit_scans_tree(remote, payload):
+    tree = git_text(remote, "ls-tree", "-r", "--name-only", "kit-scans").splitlines()
+    assert tree == ["apps/web/vercel.json", "latest.json"]
+    assert git_text(remote, "show", "kit-scans:latest.json") == payload.read_text(encoding="utf-8")
+    assert git_text(remote, "show", "kit-scans:apps/web/vercel.json") == SKIP_CONFIG.read_text(
+        encoding="utf-8"
+    )
+    assert git_text(remote, "log", "-1", "--format=%s", "kit-scans").strip() == PUBLISH_MESSAGE
+    config = json.loads(SKIP_CONFIG.read_text(encoding="utf-8"))
+    assert config["git"]["deploymentEnabled"] == {"kit-scans": False}
+    assert config["ignoreCommand"] == "exit 0"
 
 
 def load_snapshot():
@@ -159,75 +213,60 @@ def test_publish_command_wraps_reports_without_a_new_scan(tmp_path, monkeypatch)
 
 
 def test_publish_branch_script_does_not_update_main(tmp_path):
-    remote = tmp_path / "remote.git"
-    subprocess.run(["git", "init", "--bare", "-b", "main", str(remote)], check=True)
-    seed = tmp_path / "seed"
-    subprocess.run(["git", "init", "-b", "main", str(seed)], check=True)
-    subprocess.run(
-        ["git", "-C", str(seed), "config", "user.email", "tester@example.com"],
-        check=True,
-    )
-    subprocess.run(["git", "-C", str(seed), "config", "user.name", "Tester"], check=True)
-    (seed / "README").write_text("main stays untouched\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(seed), "add", "README"], check=True)
-    subprocess.run(["git", "-C", str(seed), "commit", "-m", "seed main"], check=True)
-    subprocess.run(["git", "-C", str(seed), "push", str(remote), "HEAD:refs/heads/main"], check=True)
-    main_before = subprocess.check_output(
-        ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
-        text=True,
-    ).strip()
+    remote = seed_main(tmp_path)
+    main_before = git_text(remote, "rev-parse", "refs/heads/main").strip()
     payload = tmp_path / "latest.json"
     payload.write_text('{"format_version": 1}\n', encoding="utf-8")
-    env = os.environ.copy()
-    env.pop("GITHUB_ACTIONS", None)
-    env.pop("GITHUB_TOKEN", None)
-    env["VEYRIX_KIT_PUSH_REMOTE"] = str(remote)
-    first = subprocess.run(
-        ["bash", str(SCRIPT), str(payload)],
-        check=False,
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    first = run_publish(remote, payload)
     assert first.returncode == 0, first.stderr
     assert "Published kit-scans" in first.stdout
-    main_after = subprocess.check_output(
-        ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
-        text=True,
-    ).strip()
-    assert main_after == main_before
-    published = subprocess.check_output(
-        ["git", "--git-dir", str(remote), "show", "kit-scans:latest.json"],
-        text=True,
-    )
-    assert published == payload.read_text(encoding="utf-8")
-    branches = subprocess.check_output(
-        ["git", "--git-dir", str(remote), "branch"],
-        text=True,
-    )
+    assert git_text(remote, "rev-parse", "refs/heads/main").strip() == main_before
+    assert_kit_scans_tree(remote, payload)
+    branches = git_text(remote, "branch")
     assert "main" in branches
     assert "kit-scans" in branches
     payload.write_text('{"format_version": 1, "source": "github-actions"}\n', encoding="utf-8")
-    second = subprocess.run(
-        ["bash", str(SCRIPT), str(payload)],
-        check=False,
-        env=env,
-        text=True,
-        capture_output=True,
-    )
+    second = run_publish(remote, payload)
     assert second.returncode == 0, second.stderr
-    updated = subprocess.check_output(
-        ["git", "--git-dir", str(remote), "show", "kit-scans:latest.json"],
-        text=True,
+    assert_kit_scans_tree(remote, payload)
+    assert git_text(remote, "rev-parse", "refs/heads/main").strip() == main_before
+
+
+def test_publish_adds_vercel_skip_when_the_scan_json_is_unchanged(tmp_path):
+    remote = seed_main(tmp_path)
+    main_before = git_text(remote, "rev-parse", "refs/heads/main").strip()
+    payload = tmp_path / "latest.json"
+    payload.write_text('{"format_version": 1}\n', encoding="utf-8")
+    orphan = tmp_path / "orphan"
+    subprocess.run(["git", "init", "-b", "kit-scans", str(orphan)], check=True)
+    subprocess.run(
+        ["git", "-C", str(orphan), "config", "user.email", "tester@example.com"],
+        check=True,
     )
-    assert '"github-actions"' in updated
-    assert (
-        subprocess.check_output(
-            ["git", "--git-dir", str(remote), "rev-parse", "refs/heads/main"],
-            text=True,
-        ).strip()
-        == main_before
+    subprocess.run(["git", "-C", str(orphan), "config", "user.name", "Tester"], check=True)
+    (orphan / "latest.json").write_text(payload.read_text(encoding="utf-8"), encoding="utf-8")
+    subprocess.run(["git", "-C", str(orphan), "add", "latest.json"], check=True)
+    subprocess.run(["git", "-C", str(orphan), "commit", "-m", "existing scan"], check=True)
+    subprocess.run(
+        ["git", "-C", str(orphan), "push", str(remote), "HEAD:refs/heads/kit-scans"],
+        check=True,
     )
+    before = git_text(remote, "rev-parse", "refs/heads/kit-scans").strip()
+    assert git_text(remote, "ls-tree", "-r", "--name-only", "kit-scans").splitlines() == [
+        "latest.json"
+    ]
+    first = run_publish(remote, payload)
+    assert first.returncode == 0, first.stderr
+    assert "Published kit-scans" in first.stdout
+    after = git_text(remote, "rev-parse", "refs/heads/kit-scans").strip()
+    assert after != before
+    assert_kit_scans_tree(remote, payload)
+    assert git_text(remote, "rev-parse", "refs/heads/main").strip() == main_before
+    second = run_publish(remote, payload)
+    assert second.returncode == 0, second.stderr
+    assert "already matches this scan JSON and Vercel skip config" in second.stdout
+    assert git_text(remote, "rev-parse", "refs/heads/kit-scans").strip() == after
+    assert git_text(remote, "rev-parse", "refs/heads/main").strip() == main_before
 
 
 def test_kit_page_reads_the_publication_on_each_request():
@@ -251,7 +290,16 @@ def test_workflow_publishes_off_main_and_skips_pull_requests():
     assert "continue-on-error: true" in block
     assert "secrets." not in block
     assert "publish_kit_branch.sh" in block
+    assert "apps/web/vercel.json" in workflow
     assert "HEAD:refs/heads/${branch}" in script
     assert "HEAD:refs/heads/main" not in script
     assert "HEAD:main" not in script
+    assert "apps/web/vercel.json" in script
+    assert "kit-scans.vercel.json" in script
+    config = json.loads(SKIP_CONFIG.read_text(encoding="utf-8"))
+    assert config["git"]["deploymentEnabled"]["kit-scans"] is False
+    assert config["ignoreCommand"] == "exit 0"
+    assert "deploymentEnabled" not in (ROOT / "apps" / "web" / "vercel.json").read_text(
+        encoding="utf-8"
+    )
     assert PUBLICATION_URL in loader
