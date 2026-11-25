@@ -53,3 +53,88 @@ jobs:
             echo "demo build still proxies the API" >&2
             exit 1
           fi
+  api-audit:
+    name: API dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime dependencies
+        run: |
+          python -m venv /tmp/veyrix-audit
+          /tmp/veyrix-audit/bin/python -m pip install --upgrade pip
+          /tmp/veyrix-audit/bin/python -m pip install .
+          # veyrix itself is not on PyPI. pip-audit --strict stops when it
+          # cannot look that distribution up. The third-party dependencies
+          # stay installed after this uninstall.
+          /tmp/veyrix-audit/bin/python -m pip uninstall -y veyrix
+      - name: Audit installed distributions
+        run: |
+          python -m venv /tmp/pip-audit-tool
+          /tmp/pip-audit-tool/bin/python -m pip install --disable-pip-version-check 'pip-audit>=2.10.1,<3'
+          site=$(/tmp/veyrix-audit/bin/python -c 'import site; print(site.getsitepackages()[0])')
+          set +e
+          /tmp/pip-audit-tool/bin/pip-audit \
+            --path "$site" \
+            --progress-spinner=off \
+            --strict \
+            --format json \
+            --output "$RUNNER_TEMP/pip-audit.json"
+          status=$?
+          set -e
+          python - "$RUNNER_TEMP/pip-audit.json" "$status" <<'PY'
+          import json
+          import sys
+
+          report_path, status_text = sys.argv[1], sys.argv[2]
+          report = json.load(open(report_path, encoding="utf-8"))
+          deps = report.get("dependencies") or []
+          names = {item["name"].lower() for item in deps}
+          required = {
+              "fastapi",
+              "uvicorn",
+              "sqlalchemy",
+              "psycopg",
+              "alembic",
+              "pydantic-settings",
+              "redis",
+              "mcp",
+              "httpx",
+          }
+          missing = sorted(required - names)
+          findings = []
+          for item in deps:
+              version = item.get("version")
+              for vuln in item.get("vulns") or []:
+                  findings.append(f"{item['name']} {version}: {vuln.get('id')}")
+          print(f"pip-audit checked {len(deps)} installed distributions")
+          print(f"vulnerabilities: {len(findings)}")
+          for line in findings:
+              print(line)
+          if missing:
+              print(
+                  "expected project dependencies were not in the audit set: "
+                  + ", ".join(missing),
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          sys.exit(int(status_text))
+          PY
+  web-audit:
+    name: Web dependency audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

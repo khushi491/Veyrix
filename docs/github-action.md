@@ -27,7 +27,7 @@ permissions:
   security-events: write
 ```
 
-`security-events: write` is the permission the upload needs. `contents: read` is what `actions/checkout` needs. `actions: read` is what the code scanning API asks for on a private repository. A public repository can upload with `security-events: write` and `contents: read`. Leave the token input unset so `github/codeql-action/upload-sarif` uses the workflow token. Do not put a personal access token or an API key in the workflow file.
+`security-events: write` is the permission the upload needs. `contents: read` is what `actions/checkout` needs. `actions: read` is what the code scanning API asks for on a private repository. A public repository can upload with `security-events: write` and `contents: read`. Leave the token input unset so `github/codeql-action/upload-sarif@v4` uses the workflow token. Do not put a personal access token or an API key in the workflow file.
 
 Fork pull requests and Dependabot pull requests receive a read-only token. The action still writes the JSON report and the SARIF file, records a notice, and skips the upload. The job does not fail for that skip. Same-repository pull requests, `workflow_dispatch`, and the schedule can upload when the permission above is set.
 

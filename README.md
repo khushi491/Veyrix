@@ -149,6 +149,7 @@ steps:
 
 - **API:** Python 3.12, PostgreSQL 17, `alembic upgrade head`, `ruff check .`, and `pytest`.
 - **Web:** Node 22, `npm ci`, typecheck, the production build, and a demo build that fails if `/api` still proxies to `127.0.0.1:8000`.
+- **Dependency audits:** `npm audit --omit=dev --audit-level=high` for the dashboard, and `pip-audit` against the installed API dependencies. Dependabot opens weekly update pull requests. Commands: [TESTING.md](TESTING.md).
 
 The LLM tests drive the scripted transport, so the workflow needs no model endpoint and no API key. PostgreSQL integration tests use `TEST_DATABASE_URL` and skip when it is unset. Browser end-to-end tests are on the roadmap.
 

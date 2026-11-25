@@ -13,6 +13,36 @@ they use no external network services, production credentials, or external model
 LLM adapter tests use a scripted chat transport and an in-process HTTP replay. They do
 not read `VEYRIX_LLM_API_KEY` and they do not call Ollama or a hosted model.
 
+## Dependency audits
+
+Foundation checks audit runtime dependencies on every push and pull request. The workflow permission stays `contents: read`. Neither check calls a paid API.
+
+From `apps/web`, production dependencies only:
+
+```sh
+npm ci
+npm audit --omit=dev --audit-level=high
+```
+
+`npm audit` exits non-zero when a high or critical advisory applies to a production dependency.
+
+For the API, install the project without the `dev` extra, drop the unpublished `veyrix` distribution, and audit that environment with [pip-audit](https://github.com/pypa/pip-audit) (PyPA, the default PyPI advisory service). `--strict` fails if any installed distribution cannot be collected. `veyrix` is uninstalled first because it is not on PyPI and that collection check would fail on the local package. Its third-party dependencies remain installed. The virtualenv's `pip` is part of the audited set.
+
+```sh
+python3 -m venv /tmp/veyrix-audit
+/tmp/veyrix-audit/bin/python -m pip install --upgrade pip
+/tmp/veyrix-audit/bin/python -m pip install .
+/tmp/veyrix-audit/bin/python -m pip uninstall -y veyrix
+python3 -m venv /tmp/pip-audit-tool
+/tmp/pip-audit-tool/bin/python -m pip install 'pip-audit>=2.10.1,<3'
+site=$(/tmp/veyrix-audit/bin/python -c 'import site; print(site.getsitepackages()[0])')
+/tmp/pip-audit-tool/bin/pip-audit --path "$site" --progress-spinner=off --strict
+```
+
+The API job prints how many distributions pip-audit checked and fails if a direct dependency is missing from that set. That guards against a path that audits nothing.
+
+[Dependabot](.github/dependabot.yml) opens weekly update pull requests for GitHub Actions, `apps/web` npm, and the root `pyproject.toml` pip dependencies. Each ecosystem keeps at most 3 open pull requests.
+
 ## GitHub Action
 
 [`.github/workflows/veyrix-scan.yml`](.github/workflows/veyrix-scan.yml) calls the local composite action on pull requests, a daily schedule (`17 6 * * *` UTC), and `workflow_dispatch`. It scans the local vulnerable fixture without a failing gate and the local hardened fixture with `fail-under: 100`. JSON and SARIF are uploaded as artifacts. The vulnerable SARIF is sent to code scanning when the token can write `security-events`. The scan uses adapter and variant flags, so the SARIF artifact is `veyrix-target.json` rather than a file this pull request adds. GitHub fails the code scanning check when error-level results sit on changed lines. The workflow does not call a model and does not need Postgres. Details: [docs/github-action.md](docs/github-action.md).
@@ -47,7 +77,7 @@ npm ci
 npm run build
 npm run typecheck
 NEXT_PUBLIC_VEYRIX_DEMO=true npm run build
-npm audit
+npm audit --omit=dev --audit-level=high
 ```
 
 `make demo-snapshot` regenerates `apps/web/demo/snapshot.json` from the local engine.

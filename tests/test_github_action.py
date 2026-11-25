@@ -317,7 +317,7 @@ def test_workflow_and_action_declare_the_scan_contract():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     docs = (ROOT / "docs" / "github-action.md").read_text(encoding="utf-8")
     assert "using: composite" in action
-    assert "github/codeql-action/upload-sarif@v3" in action
+    assert "github/codeql-action/upload-sarif@v4" in action
     assert "security-events: write" in action
     assert "uses: ./" in workflow
     assert 'cron: "17 6 * * *"' in workflow
