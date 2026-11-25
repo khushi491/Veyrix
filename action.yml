@@ -116,7 +116,7 @@ runs:
     - name: Upload SARIF to code scanning
       id: upload
       if: ${{ (success() || failure()) && steps.scan.outputs.upload == 'true' }}
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: ${{ steps.scan.outputs.sarif-path }}
         category: ${{ inputs.category }}
