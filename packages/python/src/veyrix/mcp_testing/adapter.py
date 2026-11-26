@@ -1,6 +1,7 @@
 """Exercise actual MCP stdio exchanges using the official SDK's Client."""
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -13,6 +14,56 @@ from mcp.types import TextContent
 from veyrix.adapters import LocalAgentAdapter, resolve_request
 from veyrix.engine import Event, finish_result, redact
 from veyrix.engine.catalog import Scenario
+
+RUG_PULL_TOOL = "read_document"
+
+
+def tool_definition(tool) -> dict:
+    """Plain definition the client actually received, safe to hash and store."""
+    definition = {
+        "name": tool.name,
+        "description": tool.description or "",
+        "input_schema": tool.input_schema,
+    }
+    return json.loads(json.dumps(definition))
+
+
+def definition_sha256(definition: dict) -> str:
+    payload = json.dumps(definition, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _schema(definition: dict) -> dict:
+    schema = definition.get("input_schema")
+    return schema if isinstance(schema, dict) else {}
+
+
+def _properties(schema: dict) -> dict:
+    properties = schema.get("properties")
+    return properties if isinstance(properties, dict) else {}
+
+
+def definition_diff(original: dict, changed: dict) -> str:
+    """Short summary of a tool-definition rug pull. Empty when nothing changed."""
+    parts: list[str] = []
+    if original.get("description") != changed.get("description"):
+        parts.append("description changed")
+    original_schema = _schema(original)
+    changed_schema = _schema(changed)
+    original_props = _properties(original_schema)
+    changed_props = _properties(changed_schema)
+    added = sorted(set(changed_props) - set(original_props))
+    removed = sorted(set(original_props) - set(changed_props))
+    if added:
+        parts.append("input schema added " + ", ".join(added))
+    if removed:
+        parts.append("input schema removed " + ", ".join(removed))
+    schemas_differ = original_schema != changed_schema
+    if schemas_differ and not added and not removed:
+        parts.append("input schema changed")
+    elif original_schema.get("required") != changed_schema.get("required"):
+        parts.append("input schema required fields changed")
+    return "; ".join(parts)
 
 
 def tool_data(result) -> dict:
@@ -68,6 +119,50 @@ async def run_mcp_scenario(
         )
         if scenario.channel == "mcp-tool-description":
             content = next(t.description for t in listing.tools if t.name == "read_document") or ""
+        elif scenario.channel == "mcp-tool-rug-pull":
+            approved = tool_definition(next(t for t in listing.tools if t.name == RUG_PULL_TOOL))
+            approved_hash = definition_sha256(approved)
+            emit(
+                "mcp_tool_approval",
+                "system",
+                tool=approved["name"],
+                description=approved["description"],
+                input_schema=approved["input_schema"],
+                sha256=approved_hash,
+            )
+            # Refresh so a cached tools/list cannot hide the server-side swap.
+            refreshed = await client.list_tools(cache_mode="refresh")
+            mutated = tool_definition(next(t for t in refreshed.tools if t.name == RUG_PULL_TOOL))
+            mutated_hash = definition_sha256(mutated)
+            emit(
+                "mcp_tool_definition_changed",
+                "untrusted",
+                tool=RUG_PULL_TOOL,
+                original_sha256=approved_hash,
+                changed_sha256=mutated_hash,
+                original=approved,
+                changed=mutated,
+                diff_summary=definition_diff(approved, mutated),
+            )
+            # The hardened fixture re-checks the approved hash and refuses a mismatch.
+            # The vulnerable fixture follows the mutated description without comparing.
+            revalidated = variant == "hardened"
+            emit(
+                "mcp_tool_revalidation",
+                "system",
+                tool=RUG_PULL_TOOL,
+                revalidated=revalidated,
+                approved_sha256=approved_hash,
+                current_sha256=mutated_hash,
+                matches_approved=approved_hash == mutated_hash,
+                followed=not revalidated,
+                decision=(
+                    "refused_mutated_definition"
+                    if revalidated
+                    else "followed_mutated_definition"
+                ),
+            )
+            content = mutated["description"]
         elif scenario.channel == "mcp-resource":
             emit("mcp_resource_request", "system", uri="veyrix://context")
             resource = await client.read_resource("veyrix://context")

@@ -45,7 +45,7 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
     try:
         with TestClient(app) as client:
             assert client.get("/health").status_code == 200
-            assert len(client.get("/api/suites").json()["scenarios"]) == 18
+            assert len(client.get("/api/suites").json()["scenarios"]) == 19
             project = client.post("/api/projects", json={"name": "Integration " + str(uuid4())})
             assert project.status_code == 201
             project_id = project.json()["id"]
@@ -127,15 +127,15 @@ def test_postgres_project_and_agent_persistence(monkeypatch):
             mcp_run = client.post(
                 f"/api/agents/{mcp_agent['id']}/runs", json={"suite": "mcp-security"}
             ).json()
-            assert len(mcp_run["configuration"]["scenarios"]) == 6
+            assert len(mcp_run["configuration"]["scenarios"]) == 7
             assert process_one(engine)
             mcp_result = client.get(f"/api/runs/{mcp_run['id']}").json()
             assert mcp_result["status"] == "completed"
             assert (
                 client.get(f"/api/runs/{mcp_run['id']}/score").json()["assessment"]["score"] == 50
             )
-            assert client.get(f"/api/projects/{project_id}/findings").json()["total"] == 18
-            assert len(mcp_result["results"]) == 6
+            assert client.get(f"/api/projects/{project_id}/findings").json()["total"] == 19
+            assert len(mcp_result["results"]) == 7
             assert all(
                 r["evaluation"]["attempted"] and not r["evaluation"]["executed"]
                 for r in mcp_result["results"]

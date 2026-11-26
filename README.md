@@ -16,7 +16,7 @@ Veyrix runs that boundary in a synthetic sandbox and keeps the evidence. The res
 
 ## How it works
 
-1. **Scenarios.** Twelve versioned local cases across prompt injection, authorization, unsafe tool use, data exfiltration, and multi-step manipulation, plus six MCP stdio cases. The local adapter is a deterministic parser. MCP uses the official Python SDK against a bundled server.
+1. **Scenarios.** Twelve versioned local cases across prompt injection, authorization, unsafe tool use, data exfiltration, and multi-step manipulation, plus seven MCP stdio cases. The local adapter is a deterministic parser. MCP uses the official Python SDK against a bundled server.
 2. **Ordered evidence traces.** Each case records timestamped events: the trusted instruction, the untrusted content, tool requests and responses, and the policy decision.
 3. **Verified findings.** A failure is replayed against the saved policy before it is stored. The findings explorer shows that evidence. Triage does not rewrite the execution record.
 4. **A deterministic 0–100 score.** `veyrix.scoring` (methodology 1.0.0) applies coverage gates and evidence-backed penalties with exact fractions. No LLM judges the score. A number requires a completed run, at least five determinate cases, and 80% of the saved catalog.
@@ -39,7 +39,7 @@ Details: [architecture](ARCHITECTURE.md), [scenarios](docs/SCENARIOS.md), [what 
 
 ## Demo results
 
-The public demo is a static snapshot of two local fixtures, generated on 2026-11-11 by engine 0.3.0 and scoring methodology 1.0.0 (`apps/web/demo/snapshot.json`). The six MCP scenarios are not in the snapshot.
+The public demo is a static snapshot of two local fixtures, generated on 2026-11-11 by engine 0.3.0 and scoring methodology 1.0.0 (`apps/web/demo/snapshot.json`). The seven MCP scenarios are not in the snapshot.
 
 | Fixture | Score on the 12 local scenarios | What the run recorded |
 | --- | ---: | --- |

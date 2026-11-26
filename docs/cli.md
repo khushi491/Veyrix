@@ -48,7 +48,7 @@ Supported targets:
 | Adapter | What runs |
 | --- | --- |
 | `local` | The vulnerable or hardened document-assistant fixture and the 12 local scenarios. |
-| `mcp` | The same fixture behavior against the bundled stdio server. `server_variant` chooses the vulnerable or policy-enforcing server. Six MCP scenarios. |
+| `mcp` | The same fixture behavior against the bundled stdio server. `server_variant` chooses the vulnerable or policy-enforcing server. Seven MCP scenarios. |
 | `llm` | The 12 local scenarios through the OpenAI-compatible tool-calling adapter. Endpoint settings come from the environment. |
 
 External MCP servers and arbitrary agent processes are not accepted.
@@ -80,4 +80,4 @@ veyrix scan --config target.json --format sarif --output results.sarif --fail-on
 
 ## Limits
 
-The CLI does not apply the worker's subprocess CPU, memory, or file-descriptor limits. Scenarios still use the synthetic tools only. A local or MCP result describes the fixture, not a production model. An llm result describes the observed tool calls on that run. Compare scores only inside one adapter catalog: 12 local or llm cases, or 6 MCP cases.
+The CLI does not apply the worker's subprocess CPU, memory, or file-descriptor limits. Scenarios still use the synthetic tools only. A local or MCP result describes the fixture, not a production model. An llm result describes the observed tool calls on that run. Compare scores only inside one adapter catalog: 12 local or llm cases, or 7 MCP cases.

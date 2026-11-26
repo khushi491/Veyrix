@@ -7341,6 +7341,16 @@
         "version": "1",
         "channel": "mcp-tool-response",
         "guarded": false
+      },
+      {
+        "adapter": "mcp",
+        "id": "mcp-tool-rug-pull",
+        "title": "MCP tool definition changes after approval",
+        "category": "mcp-security",
+        "severity": "high",
+        "version": "1",
+        "channel": "mcp-tool-rug-pull",
+        "guarded": false
       }
     ]
   },

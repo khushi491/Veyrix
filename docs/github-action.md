@@ -179,7 +179,7 @@ A live `llm` scan is optional and is not part of this repository's CI. The runne
 
 ## Limits
 
-The action runs the CLI in-process. It does not apply the worker subprocess CPU, memory, or file-descriptor limits. Scenarios still use the synthetic tools only. A `local` or `mcp` result describes the fixture, not a production model. Compare scores only inside one adapter catalog: 12 local or llm cases, or 6 MCP cases.
+The action runs the CLI in-process. It does not apply the worker subprocess CPU, memory, or file-descriptor limits. Scenarios still use the synthetic tools only. A `local` or `mcp` result describes the fixture, not a production model. Compare scores only inside one adapter catalog: 12 local or llm cases, or 7 MCP cases.
 
 Code scanning stores the SARIF GitHub accepts. The action does not clear alerts from older categories. Uploading the hardened fixture in the same category as the vulnerable fixture would replace those results, which is why the self-test uploads only the vulnerable SARIF.
 

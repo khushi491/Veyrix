@@ -26,7 +26,7 @@ Finding triage changes live in a separate append-only history table.
 ## Boundaries
 
 Local development mode is explicitly opt-in. Hosted authentication is fail-closed and
-not implemented. Twelve local and six MCP security scenarios run in the background worker.
+not implemented. Twelve local and seven MCP security scenarios run in the background worker.
 The Compose runner uses synthetic tools, restricted external networking, timeouts and
 resource limits. Neither agent output
 nor MCP responses may be executed as shell commands on the host. Model tool calls are
