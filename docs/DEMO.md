@@ -9,7 +9,7 @@ PostgreSQL, Redis, or the worker, and it never exposes `VEYRIX_DEV_MODE`.
 Create, register, run, and triage controls are hidden or disabled. Scores, findings,
 and traces come from `veyrix.engine.run_scenario`, `veyrix.scoring.calculate_score`,
 and `veyrix.findings.verified_result`. The snapshot covers the 12 local scenarios.
-The six MCP stdio scenarios still run through the local worker. They are not part of
+The seven MCP stdio scenarios still run through the local worker. They are not part of
 this static snapshot. The `llm` adapter is not part of the snapshot either.
 
 ## Regenerate the snapshot
